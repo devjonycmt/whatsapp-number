@@ -1166,3 +1166,22 @@ function closeUserLifetimeModal() {
   const modal = document.getElementById("userLifetimeModal");
   if (modal) modal.classList.add("hidden");
 }
+
+// ১. F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U ব্লক করা
+document.addEventListener("keydown", function (e) {
+  if (
+    e.key === "F12" ||
+    (e.ctrlKey &&
+      e.shiftKey &&
+      (e.key === "I" || e.key === "i" || e.key === "J" || e.key === "j")) ||
+    (e.ctrlKey && (e.key === "U" || e.key === "u"))
+  ) {
+    e.preventDefault();
+    return false;
+  }
+});
+
+// ২. মাউসের রাইট-ক্লিক (Context Menu) ব্লক করা
+document.addEventListener("contextmenu", function (e) {
+  e.preventDefault();
+});
