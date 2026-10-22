@@ -172,34 +172,58 @@
 
         <!-- Balance Card -->
         <div
-          class="p-5 mx-5 my-6 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-inner relative overflow-hidden"
+          class="p-5 mx-5 my-6 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-inner relative overflow-hidden space-y-4"
         >
           <div
             class="absolute -right-6 -bottom-6 text-slate-800/30 text-7xl font-black pointer-events-none"
           >
             <i class="fa-solid fa-wallet"></i>
           </div>
-          <p
-            class="text-[11px] font-bold text-slate-400 uppercase tracking-wider"
-          >
-            Available Balance
-          </p>
-          <div class="flex items-center justify-between mt-2 relative z-10">
-            <span
-              id="sidebarBalance"
-              class="text-3xl font-black text-emerald-400 tracking-tight"
-              >৳0.00</span
+          <div>
+            <p
+              class="text-[11px] font-bold text-slate-400 uppercase tracking-wider"
             >
-            <button
-              onclick="checkBalance()"
-              class="w-9 h-9 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl transition flex items-center justify-center shadow cursor-pointer"
-              title="Refresh Balance"
+              Available Balance
+            </p>
+            <div class="flex items-center justify-between mt-2 relative z-10">
+              <span
+                id="sidebarBalance"
+                class="text-3xl font-black text-emerald-400 tracking-tight"
+                >৳0.00</span
+              >
+              <button
+                onclick="checkBalance()"
+                class="w-9 h-9 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl transition flex items-center justify-center shadow cursor-pointer"
+                title="Refresh Balance"
+              >
+                <i
+                  class="fa-solid fa-arrows-rotate text-xs"
+                  id="balanceSpinner"
+                ></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- DAILY NUMBER LIMIT WIDGET -->
+          <div class="pt-3 border-t border-slate-800/80 space-y-2">
+            <div
+              class="flex items-center justify-between text-xs text-slate-400 font-semibold"
             >
-              <i
-                class="fa-solid fa-arrows-rotate text-xs"
-                id="balanceSpinner"
-              ></i>
-            </button>
+              <span class="flex items-center gap-1.5"
+                ><i class="fa-solid fa-layer-group text-blue-400"></i> Daily
+                Limit</span
+              >
+              <span id="userLimitCount" class="text-white font-mono font-bold"
+                >--/--</span
+              >
+            </div>
+            <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+              <div
+                id="userLimitProgressBar"
+                class="bg-blue-500 h-full rounded-full transition-all duration-300"
+                style="width: 0%"
+              ></div>
+            </div>
           </div>
         </div>
 
@@ -766,26 +790,25 @@
               </button>
             </div>
 
-            <!-- Users Table Card -->
+            <!-- ALL REGISTERED USERS TABLE -->
             <div
-              class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-5 sm:p-6 md:p-8 space-y-4"
+              class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 space-y-4"
             >
               <div
-                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2"
+                class="flex items-center justify-between pb-3 border-b border-slate-100"
               >
-                <h3 class="text-lg font-extrabold text-slate-900">
+                <h3 class="text-base font-extrabold text-slate-900">
                   All Registered Users
                 </h3>
                 <button
                   onclick="loadAllUsersAdmin()"
-                  class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3.5 py-2 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer self-start sm:self-auto"
+                  class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-xl transition"
                 >
-                  <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                  <i class="fa-solid fa-rotate-right mr-1"></i> Refresh
                 </button>
               </div>
-
               <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse min-w-[650px]">
+                <table class="w-full text-left border-collapse min-w-[700px]">
                   <thead>
                     <tr
                       class="border-b border-slate-100 text-slate-400 text-xs uppercase tracking-wider font-bold"
@@ -793,7 +816,8 @@
                       <th class="py-3 px-4">USER EMAIL</th>
                       <th class="py-3 px-4">ROLE</th>
                       <th class="py-3 px-4">CREATED AT</th>
-                      <th class="py-3 px-4 text-center">ACTIONS</th>
+                      <th class="py-3 px-4">DAILY LIMIT</th>
+                      <th class="py-3 px-4">ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody
@@ -801,11 +825,8 @@
                     class="divide-y divide-slate-100 text-sm font-semibold text-slate-700"
                   >
                     <tr>
-                      <td
-                        colspan="4"
-                        class="py-6 text-center text-slate-400 font-normal"
-                      >
-                        Loading user profiles...
+                      <td colspan="5" class="py-6 text-center text-slate-400">
+                        Loading system users...
                       </td>
                     </tr>
                   </tbody>
@@ -906,6 +927,12 @@
         </main>
       </div>
     </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER (BOTTOM-RIGHT) -->
+    <div
+      id="toastContainer"
+      class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none"
+    ></div>
 
     <script>
       // Helper script for mobile sidebar toggle drawer

@@ -18,6 +18,8 @@ try {
 let loggedInUser = null;
 let currentOrderId = "";
 let otpInterval = null;
+let currentUserDailyLimit = 20;
+let currentUserTodayBoughtCount = 0;
 
 // DOM Elements
 const loginOverlay = document.getElementById("loginOverlay");
@@ -28,9 +30,11 @@ const navAdminUsers = document.getElementById("navAdminUsers");
 const dashboardView = document.getElementById("dashboardView");
 const whatsappView = document.getElementById("whatsappView");
 const adminUsersView = document.getElementById("adminUsersView");
+const reportView = document.getElementById("reportView");
 
 const navDashboard = document.getElementById("navDashboard");
 const navWhatsapp = document.getElementById("navWhatsapp");
+const navReport = document.getElementById("navReport");
 
 const sidebarBalance = document.getElementById("sidebarBalance");
 const balanceSpinner = document.getElementById("balanceSpinner");
@@ -83,6 +87,101 @@ async function checkBalance() {
   }
 }
 
+// === 1. SHOW DATABASE LIMIT DIRECTLY IN SIDEBAR ===
+async function updateUserLimitSidebar() {
+  if (!_supabase || !loggedInUser) return;
+
+  // Database theke user-er current daily_limit ana hocche
+  const { data: profile } = await _supabase
+    .from("user_profiles")
+    .select("daily_limit")
+    .eq("email", loggedInUser.email)
+    .single();
+
+  if (profile && profile.daily_limit !== undefined) {
+    currentUserDailyLimit = profile.daily_limit;
+  } else {
+    currentUserDailyLimit = 0;
+  }
+
+  // Sidebar UI Update
+  const limitCountEl = document.getElementById("userLimitCount");
+  const progressBarEl = document.getElementById("userLimitProgressBar");
+
+  if (limitCountEl) {
+    limitCountEl.innerText = `${currentUserDailyLimit}`;
+  }
+
+  if (progressBarEl) {
+    progressBarEl.style.width = currentUserDailyLimit > 0 ? "100%" : "0%";
+    if (currentUserDailyLimit <= 2) {
+      progressBarEl.className =
+        "bg-rose-500 h-full rounded-full transition-all duration-300";
+    } else {
+      progressBarEl.className =
+        "bg-blue-500 h-full rounded-full transition-all duration-300";
+    }
+  }
+
+  // Buy Button Disable/Enable Check
+  if (btnBuyNumber) {
+    if (currentUserDailyLimit <= 0) {
+      btnBuyNumber.disabled = true;
+      btnBuyNumber.className =
+        "w-full sm:w-96 mx-auto bg-slate-100 text-slate-400 font-bold px-8 py-4 rounded-2xl cursor-not-allowed flex items-center justify-center gap-3 shadow-none border border-slate-200 transition-all";
+      btnBuyNumber.innerHTML = `<i class="fa-solid fa-ban text-base"></i> Daily Limit Reached`;
+    } else {
+      btnBuyNumber.disabled = false;
+      btnBuyNumber.className =
+        "w-full sm:w-96 mx-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-8 py-4 rounded-2xl shadow-xl shadow-emerald-600/25 transition-all flex items-center justify-center gap-3 cursor-pointer active:scale-[0.99]";
+      btnBuyNumber.innerHTML = `<i class="fa-solid fa-cart-shopping text-base"></i> Buy WhatsApp Number`;
+    }
+  }
+}
+
+// === HELPER TO UPDATE UI INSTANTLY ===
+function updateSidebarUIOnly() {
+  let remaining = currentUserDailyLimit - currentUserTodayBoughtCount;
+  if (remaining < 0) remaining = 0;
+
+  const limitCountEl = document.getElementById("userLimitCount");
+  const progressBarEl = document.getElementById("userLimitProgressBar");
+
+  if (limitCountEl) {
+    limitCountEl.innerText = `${remaining} / ${currentUserDailyLimit}`;
+  }
+
+  if (progressBarEl) {
+    let percentage = (remaining / currentUserDailyLimit) * 100;
+    if (isNaN(percentage)) percentage = 0;
+    progressBarEl.style.width = `${percentage}%`;
+
+    if (percentage <= 20) {
+      progressBarEl.className =
+        "bg-rose-500 h-full rounded-full transition-all duration-300";
+    } else if (percentage <= 50) {
+      progressBarEl.className =
+        "bg-amber-500 h-full rounded-full transition-all duration-300";
+    } else {
+      progressBarEl.className =
+        "bg-blue-500 h-full rounded-full transition-all duration-300";
+    }
+  }
+
+  if (btnBuyNumber) {
+    if (remaining <= 0) {
+      btnBuyNumber.disabled = true;
+      btnBuyNumber.className =
+        "w-full sm:w-96 mx-auto bg-slate-100 text-slate-400 font-bold px-8 py-4 rounded-2xl cursor-not-allowed flex items-center justify-center gap-3 shadow-none border border-slate-200 transition-all";
+      btnBuyNumber.innerHTML = `<i class="fa-solid fa-ban text-base"></i> Daily Limit Reached`;
+    } else {
+      btnBuyNumber.disabled = false;
+      btnBuyNumber.className =
+        "w-full sm:w-96 mx-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-8 py-4 rounded-2xl shadow-xl shadow-emerald-600/25 transition-all flex items-center justify-center gap-3 cursor-pointer active:scale-[0.99]";
+      btnBuyNumber.innerHTML = `<i class="fa-solid fa-cart-shopping text-base"></i> Buy WhatsApp Number`;
+    }
+  }
+}
 // === STRICT LOGIN SYSTEM ===
 async function handleLogin() {
   const email = document.getElementById("loginEmail").value.trim();
@@ -121,6 +220,7 @@ function initUserSession() {
   currentUserEmail.innerText = loggedInUser.email;
 
   checkBalance();
+  updateUserLimitSidebar();
 
   if (loggedInUser.role === "admin") {
     navAdminUsers.classList.remove("hidden");
@@ -154,7 +254,9 @@ async function createNewUser() {
 
   const { data, error } = await _supabase
     .from("user_profiles")
-    .insert([{ email: email, password: password, role: "user" }]);
+    .insert([
+      { email: email, password: password, role: "user", daily_limit: 20 },
+    ]);
 
   if (!error) {
     showToast("User Account Created Successfully!");
@@ -166,41 +268,80 @@ async function createNewUser() {
   }
 }
 
+// === LOAD ALL USERS IN ADMIN PANEL ===
 async function loadAllUsersAdmin() {
-  if (!adminUsersTableBody) return;
+  if (!_supabase) return;
+  const tbody = document.getElementById("adminUsersTableBody");
+  if (!tbody) return;
 
-  const { data, error } = await _supabase
+  const { data: users } = await _supabase
     .from("user_profiles")
     .select("*")
     .order("created_at", { ascending: false });
 
-  if (data && data.length > 0) {
-    adminUsersTableBody.innerHTML = "";
-    data.forEach((u) => {
-      let roleBadge =
-        u.role === "admin"
-          ? `<span class="bg-amber-50 text-amber-700 border border-amber-200/80 px-2.5 py-1 rounded-lg text-xs font-bold">admin</span>`
-          : `<span class="bg-slate-100 text-slate-600 border border-slate-200/80 px-2.5 py-1 rounded-lg text-xs font-bold">user</span>`;
-
+  if (users && users.length > 0) {
+    tbody.innerHTML = "";
+    users.forEach((user) => {
+      const createdDate = user.created_at
+        ? new Date(user.created_at).toLocaleDateString()
+        : "N/A";
       const row = document.createElement("tr");
-      row.className = "hover:bg-slate-50/80 transition";
+      row.className = "hover:bg-slate-50 transition border-b border-slate-100";
       row.innerHTML = `
-        <td class="py-3.5 px-4 font-semibold text-slate-900">${u.email}</td>
-        <td class="py-3.5 px-4">${roleBadge}</td>
-        <td class="py-3.5 px-4 text-xs font-medium text-slate-400">${new Date(u.created_at).toLocaleDateString()}</td>
-        <td class="py-3.5 px-4 text-center space-x-2">
-          <button onclick="editUserInfo('${u.id}', '${u.email}', '${u.password || ""}', '${u.role}')" class="bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer" title="Edit User Credentials">
-            <i class="fa-solid fa-user-pen mr-1"></i> Edit User
-          </button>
-          <button onclick="deleteUser('${u.id}', '${u.email}')" class="bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer" title="Delete User">
-            <i class="fa-solid fa-trash-can mr-1"></i> Delete
-          </button>
+        <td class="py-3 px-4 font-bold text-slate-900">${user.email}</td>
+        <td class="py-3 px-4">
+          <span class="px-2.5 py-1 rounded-md text-xs font-bold ${user.role === "admin" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}">
+            ${user.role}
+          </span>
+        </td>
+        <td class="py-3 px-4 text-xs text-slate-500 font-mono">${createdDate}</td>
+        <td class="py-3 px-4">
+          <div class="flex items-center gap-2">
+            <input type="number" id="limitInput_${user.id}" value="${user.daily_limit !== undefined ? user.daily_limit : 20}" placeholder="Limit" class="w-20 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-xl text-xs font-extrabold text-slate-900 text-center focus:outline-none focus:border-blue-500" />
+            <button onclick="saveUserLimit('${user.id}', '${user.email}')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer flex items-center gap-1">
+              <i class="fa-solid fa-check"></i> Save
+            </button>
+          </div>
+        </td>
+        <td class="py-3 px-4">
+          <div class="flex items-center gap-2">
+            <button onclick="editUserInfo('${user.id}', '${user.email}', '${user.password || ""}', '${user.role}')" class="bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1 rounded-xl transition cursor-pointer flex items-center gap-1">
+              <i class="fa-solid fa-user-pen text-[10px]"></i> Edit User
+            </button>
+            <button onclick="deleteUser('${user.id}', '${user.email}')" class="bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold px-3 py-1 rounded-xl transition cursor-pointer flex items-center gap-1">
+              <i class="fa-solid fa-trash text-[10px]"></i> Delete
+            </button>
+          </div>
         </td>
       `;
-      adminUsersTableBody.appendChild(row);
+      tbody.appendChild(row);
     });
   } else {
-    adminUsersTableBody.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-slate-400 font-normal">No user accounts found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">No registered users found.</td></tr>`;
+  }
+}
+
+// === SAVE USER LIMIT ===
+async function saveUserLimit(userId, userEmail) {
+  const limitInput = document.getElementById(`limitInput_${userId}`);
+  if (!limitInput || !_supabase) return;
+
+  const newLimit = parseInt(limitInput.value);
+  if (isNaN(newLimit) || newLimit < 0) {
+    showToast("Please enter a valid limit number!", true);
+    return;
+  }
+
+  const { error } = await _supabase
+    .from("user_profiles")
+    .update({ daily_limit: newLimit })
+    .eq("id", userId);
+
+  if (!error) {
+    showToast(`Success! Daily limit for ${userEmail} updated to ${newLimit}.`);
+    updateUserLimitSidebar();
+  } else {
+    showToast("Failed to update daily limit!", true);
   }
 }
 
@@ -270,11 +411,7 @@ async function deleteUser(userId, email) {
     showToast("Error deleting user: " + error.message, true);
   }
 }
-// DOM Elements section-e jog করুন:
-const reportView = document.getElementById("reportView");
-const navReport = document.getElementById("navReport");
 
-// switchTab Function-টি এভাবে আপডেট করুন:
 function switchTab(tab) {
   stopSmartActivityPolling();
 
@@ -308,9 +445,11 @@ function switchTab(tab) {
     fetchDashboardStats();
     fetchGlobalActivityLog();
     startSmartActivityPolling();
+    updateUserLimitSidebar();
   } else if (tab === "whatsapp") {
     whatsappView.classList.remove("hidden");
     if (navWhatsapp) navWhatsapp.className = activeNav;
+    updateUserLimitSidebar();
 
     if (orderCard && !orderCard.classList.contains("hidden")) {
       if (historySection) historySection.classList.add("hidden");
@@ -355,6 +494,8 @@ async function fetchDashboardStats() {
     if (statOtp) statOtp.innerText = otpCount;
     if (statCanceled) statCanceled.innerText = canceledCount;
     if (statInvestment) statInvestment.innerText = `৳${totalSpent.toFixed(2)}`;
+
+    updateUserLimitSidebar();
   }
 }
 
@@ -399,7 +540,6 @@ async function fetchOrderHistory() {
   }
 }
 
-// === RECORD SYSTEM ACTIVITY LOG ===
 async function recordSystemLog(
   userEmail,
   actionType,
@@ -423,9 +563,24 @@ async function recordSystemLog(
   }
 }
 
-// === BUY NUMBER & ACTIVE ORDER FUNCTIONS ===
+// === 2. BUY NUMBER & MINUS 1 FROM DATABASE LIMIT ===
 async function buyNumber() {
   if (!loggedInUser) return;
+
+  // Database theke latest limit abar check kore newa
+  const { data: profile } = await _supabase
+    .from("user_profiles")
+    .select("daily_limit")
+    .eq("email", loggedInUser.email)
+    .single();
+
+  let currentLimit = profile ? profile.daily_limit : 0;
+
+  if (currentLimit <= 0) {
+    showToast("Daily limit reached! You cannot buy more numbers.", true);
+    updateUserLimitSidebar();
+    return;
+  }
 
   btnBuyNumber.disabled = true;
   btnBuyNumber.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Purchasing...`;
@@ -440,6 +595,7 @@ async function buyNumber() {
       currentOrderId = data.order_id || data.id;
       const phoneNumStr = data.number || data.phone || "Number Purchased";
 
+      // 1. Insert Order in database
       await _supabase.from("orders").insert([
         {
           order_id: String(currentOrderId),
@@ -450,13 +606,23 @@ async function buyNumber() {
         },
       ]);
 
-      // Record system activity log without replacing any old rows
       await recordSystemLog(
         loggedInUser.email,
         "NEW_ORDER",
         String(currentOrderId),
         phoneNumStr,
       );
+
+      // 2. 🟢 DATABASE THEKE 1 MINUS KORE UPDATE KORA
+      let newLimit = currentLimit - 1;
+      if (newLimit < 0) newLimit = 0;
+
+      await _supabase
+        .from("user_profiles")
+        .update({ daily_limit: newLimit })
+        .eq("email", loggedInUser.email);
+
+      currentUserDailyLimit = newLimit;
 
       orderTitle.innerText = `Order #${currentOrderId}`;
       activationId.innerText = currentOrderId;
@@ -477,6 +643,7 @@ async function buyNumber() {
       showToast("WhatsApp Number purchased successfully!");
       checkBalance();
       fetchDashboardStats();
+      updateUserLimitSidebar();
       startAutoPolling();
     } else {
       showToast("Failed: " + (data.message || JSON.stringify(data)), true);
@@ -484,8 +651,7 @@ async function buyNumber() {
   } catch (e) {
     showToast("Error buying number: " + e.message, true);
   } finally {
-    btnBuyNumber.disabled = false;
-    btnBuyNumber.innerHTML = `<i class="fa-solid fa-cart-shopping"></i> Buy WhatsApp Number`;
+    updateUserLimitSidebar();
   }
 }
 
@@ -519,7 +685,6 @@ async function checkOTP() {
         .update({ otp: String(code), status: "OTP Received" })
         .eq("order_id", String(currentOrderId));
 
-      // Record OTP received log event
       await recordSystemLog(
         loggedInUser.email,
         "OTP_RECEIVED",
@@ -552,7 +717,7 @@ function stopAutoPolling() {
     otpInterval = null;
   }
 }
-
+// === 3. CANCEL ORDER & PLUS 1 (RESTORE) TO DATABASE LIMIT ===
 async function cancelOrder() {
   if (!currentOrderId) return;
 
@@ -587,7 +752,6 @@ async function cancelOrder() {
       .update({ status: "Canceled & Refunded" })
       .eq("order_id", String(currentOrderId));
 
-    // Record separate Canceled log event
     await recordSystemLog(
       loggedInUser.email,
       "CANCELED",
@@ -595,9 +759,27 @@ async function cancelOrder() {
       phoneNumber.innerText,
     );
 
+    // 🟢 DATABASE THEKE CURRENT LIMIT ENE 1 PLUS/RESTORE KORA
+    const { data: profile } = await _supabase
+      .from("user_profiles")
+      .select("daily_limit")
+      .eq("email", loggedInUser.email)
+      .single();
+
+    let currentLimit = profile ? profile.daily_limit : 0;
+    let restoredLimit = currentLimit + 1;
+
+    await _supabase
+      .from("user_profiles")
+      .update({ daily_limit: restoredLimit })
+      .eq("email", loggedInUser.email);
+
+    currentUserDailyLimit = restoredLimit;
+
     resetToBuyView();
     checkBalance();
     fetchDashboardStats();
+    updateUserLimitSidebar();
   } catch (e) {
     showToast("Error canceling order: " + e.message, true);
   }
@@ -617,6 +799,8 @@ function resetToBuyView() {
   btnCancelOrder.disabled = false;
   btnCancelOrder.className =
     "bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium py-3 px-4 rounded-xl text-sm transition flex items-center justify-center gap-2 cursor-pointer";
+
+  updateUserLimitSidebar();
 }
 
 async function viewOrder(orderId) {
@@ -659,7 +843,7 @@ async function viewOrder(orderId) {
         }
         btnCancelOrder.disabled = true;
         btnCancelOrder.className =
-          "bg-slate-100 text-slate-400 border border-slate-200 font-bold py-3 px-4 rounded-xl text-sm flex items-center justify-center gap-2 cursor-not-allowed opacity-60";
+          "bg-slate-100 text-slate-400 font-bold py-3 px-4 rounded-xl text-sm flex items-center justify-center gap-2 cursor-not-allowed opacity-60";
         liveStatusText.innerText = "OTP received successfully!";
       } else {
         if (orderStatusText) {
@@ -689,15 +873,31 @@ function copyText(elementId) {
 }
 
 function showToast(message, isError = false) {
-  statusToast.innerText = message;
-  statusToast.classList.remove("hidden");
-  if (isError) {
-    statusToast.className =
-      "p-4 rounded-xl text-sm font-medium text-center shadow-sm bg-rose-50 text-rose-700 border border-rose-200";
-  } else {
-    statusToast.className =
-      "p-4 rounded-xl text-sm font-medium text-center shadow-sm bg-emerald-50 text-emerald-700 border border-emerald-200";
-  }
+  const container = document.getElementById("toastContainer");
+  if (!container) return;
+
+  const toast = document.createElement("div");
+  toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3.5 rounded-2xl shadow-2xl text-white text-xs font-extrabold transition-all duration-300 transform translate-y-4 opacity-0 ${
+    isError
+      ? "bg-rose-600 shadow-rose-600/40 border border-rose-500"
+      : "bg-slate-900 border border-slate-800 shadow-slate-950/50"
+  }`;
+
+  toast.innerHTML = `
+    <i class="fa-solid ${isError ? "fa-circle-exclamation text-rose-200" : "fa-circle-check text-emerald-400"} text-base"></i>
+    <span>${message}</span>
+  `;
+
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.remove("translate-y-4", "opacity-0");
+  }, 10);
+
+  setTimeout(() => {
+    toast.classList.add("translate-y-4", "opacity-0");
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
 }
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -708,80 +908,13 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-let activityLogInterval = null;
-let activityChannel = null;
-
-// === FETCH & RENDER SYSTEM ACTIVITY LOG (EXPLICIT TIME SORTING - CHAT STYLE) ===
-async function fetchGlobalActivityLog() {
-  const container = document.getElementById("globalActivityLog");
-  if (!container || !_supabase) return;
-
-  // Latest 30 ta data base theke niye asha hocche
-  const { data, error } = await _supabase
-    .from("system_logs")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(30);
-
-  if (data && data.length > 0) {
-    // Explicit Time-based Sorting: created_at time onujaayi purono theke notun (ascending) sort kora
-    data.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-
-    container.innerHTML = "";
-    data.forEach((item, index) => {
-      const fullEmail = item.user_email || "user@unknown.com";
-      const timeStr = new Date(item.created_at).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-
-      let badge = "";
-      let actionText = "";
-
-      if (item.action_type === "CANCELED") {
-        badge = `<span class="bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded text-[10px] font-bold">CANCELED</span>`;
-        actionText = `canceled order <span class="text-slate-300">#${item.order_id || ""}</span> (${item.phone_number || ""})`;
-      } else if (item.action_type === "OTP_RECEIVED") {
-        badge = `<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-bold">OTP RECEIVED</span>`;
-        actionText = `received OTP <span class="text-emerald-300 font-bold">[${item.otp_code}]</span> for <span class="text-slate-300">${item.phone_number || ""}</span>`;
-      } else {
-        badge = `<span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded text-[10px] font-bold">NEW ORDER</span>`;
-        actionText = `purchased WhatsApp number <span class="text-slate-300">${item.phone_number || ""}</span>`;
-      }
-
-      const logRow = document.createElement("div");
-      logRow.style.animationDelay = `${index * 20}ms`;
-      logRow.className =
-        "flex flex-col sm:flex-row sm:items-center justify-between gap-1 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/60 hover:border-slate-700 transition-all duration-300 animate-slideUp";
-      logRow.innerHTML = `
-        <div class="flex items-center gap-2.5">
-          ${badge}
-          <span class="text-slate-400 font-bold">${fullEmail}</span>
-          <span class="text-slate-300">${actionText}</span>
-        </div>
-        <span class="text-[11px] text-slate-500 font-semibold">${timeStr}</span>
-      `;
-      container.appendChild(logRow);
-    });
-
-    // Chat er moto automatic ekdom niche scroll hoye jabe
-    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
-  } else {
-    container.innerHTML = `<div class="text-slate-500 italic py-2">No platform activity recorded yet.</div>`;
-  }
-}
-
 let smartPollingInterval = null;
 let lastKnownLogId = null;
 
-// === SMART POLLING: Refreshes ONLY when new activity is added ===
 function startSmartActivityPolling() {
   if (smartPollingInterval) clearInterval(smartPollingInterval);
   lastKnownLogId = null;
-
   checkForNewActivity();
-
   smartPollingInterval = setInterval(async () => {
     await checkForNewActivity();
   }, 4000);
@@ -796,8 +929,7 @@ function stopSmartActivityPolling() {
 
 async function checkForNewActivity() {
   if (!_supabase) return;
-
-  const { data, error } = await _supabase
+  const { data } = await _supabase
     .from("system_logs")
     .select("id")
     .order("created_at", { ascending: false })
@@ -810,26 +942,23 @@ async function checkForNewActivity() {
       fetchGlobalActivityLog();
     } else if (latestId !== lastKnownLogId) {
       lastKnownLogId = latestId;
-      fetchGlobalActivityLog(); // 🟢 নতুন ডেটা আসলে তবেই ফিড রিফ্রেশ ও চ্যাট স্ক্রোল হবে!
+      fetchGlobalActivityLog();
     }
   }
 }
 
-// === FETCH & RENDER SYSTEM ACTIVITY LOG (TIME SORTED & CHAT STYLE AT BOTTOM) ===
 async function fetchGlobalActivityLog() {
   const container = document.getElementById("globalActivityLog");
   if (!container || !_supabase) return;
 
-  const { data, error } = await _supabase
+  const { data } = await _supabase
     .from("system_logs")
     .select("*")
     .order("created_at", { ascending: false })
     .limit(30);
 
   if (data && data.length > 0) {
-    // Explicit Time-based Sorting: পুরনো উপরে, নতুন একদম নিচে
     data.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-
     container.innerHTML = "";
     data.forEach((item, index) => {
       const fullEmail = item.user_email || "user@unknown.com";
@@ -867,15 +996,12 @@ async function fetchGlobalActivityLog() {
       `;
       container.appendChild(logRow);
     });
-
-    // চ্যাটবক্সের মতো একদম নিচে অটো-স্ক্রোল হবে
     container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
   } else {
     container.innerHTML = `<div class="text-slate-500 italic py-2">No platform activity recorded yet.</div>`;
   }
 }
 
-// === LOAD ALL USERS REPORT SHEET (WITH PER-USER VIEW BUTTON) ===
 async function loadAllUserReportSheet() {
   if (!_supabase) return;
   const todayStr = new Date().toISOString().split("T")[0];
@@ -886,7 +1012,6 @@ async function loadAllUserReportSheet() {
   const { data: usersData } = await _supabase
     .from("user_profiles")
     .select("email");
-
   const { data: ordersData } = await _supabase
     .from("orders")
     .select("*")
@@ -906,43 +1031,31 @@ async function loadAllUserReportSheet() {
       ).length;
       let investment = otps * 20;
 
-      return {
-        email: user.email,
-        bought: bought,
-        otps: otps,
-        canceled: canceled,
-        investment: investment,
-      };
+      return { email: user.email, bought, otps, canceled, investment };
     });
 
     userReports.sort((a, b) => b.investment - a.investment);
-
     const firstUser = userReports[0];
     const otherUsers = userReports.slice(1);
 
-    // 1st Place Winner Card (With Lifetime View Button)
     if (firstUser && firstUser.investment > 0) {
       topWinnerCard.classList.remove("hidden");
       topWinnerCard.innerHTML = `
         <div class="bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl border border-amber-500/40 relative overflow-hidden flex flex-col items-center text-center">
           <div class="absolute -right-10 -top-10 w-48 h-48 bg-amber-500/15 rounded-full blur-3xl"></div>
-          
           <div class="relative mb-3 flex items-center justify-center">
             <div class="w-14 h-14 rounded-full bg-gradient-to-tr from-amber-500 via-yellow-400 to-amber-300 text-slate-950 font-black text-2xl flex items-center justify-center shadow-lg shadow-amber-500/40 animate-bounce border-2 border-white">
               <span>1</span>
             </div>
             <i class="fa-solid fa-star text-amber-400 text-xs absolute -bottom-1 bg-slate-950 rounded-full p-0.5 border border-amber-400"></i>
           </div>
-
           <span class="text-[11px] uppercase tracking-widest text-amber-400 font-extrabold mt-1 mb-1 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
             <i class="fa-solid fa-crown mr-1 text-amber-400"></i> Top Performer of Today
           </span>
           <h2 class="text-xl sm:text-2xl font-black text-white mb-2">${firstUser.email}</h2>
-
           <button onclick="openUserLifetimeModal('${firstUser.email}')" class="mb-4 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5">
             <i class="fa-solid fa-eye"></i> View Lifetime History
           </button>
-          
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3.5 w-full max-w-xl mt-2 pt-4 border-t border-slate-800/80 text-xs">
             <div class="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
               <span class="text-slate-400 block mb-1 font-medium">Numbers Bought</span>
@@ -967,7 +1080,6 @@ async function loadAllUserReportSheet() {
       topWinnerCard.classList.add("hidden");
     }
 
-    // Other Performers List (With Individual View Button)
     otherUsersList.innerHTML = "";
     if (otherUsers.length > 0) {
       otherUsers.forEach((user, index) => {
@@ -1000,7 +1112,6 @@ async function loadAllUserReportSheet() {
   }
 }
 
-// === OPEN SPECIFIC USER LIFETIME REPORT MODAL ===
 async function openUserLifetimeModal(targetEmail) {
   const modal = document.getElementById("userLifetimeModal");
   const modalEmail = document.getElementById("modalUserEmail");
@@ -1022,19 +1133,13 @@ async function openUserLifetimeModal(targetEmail) {
     const grouped = {};
     data.forEach((order) => {
       const dateStr = new Date(order.created_at).toISOString().split("T")[0];
-      if (!grouped[dateStr]) {
+      if (!grouped[dateStr])
         grouped[dateStr] = { bought: 0, otps: 0, canceled: 0 };
-      }
       grouped[dateStr].bought += 1;
-      if (order.otp && order.otp !== "Waiting..." && order.otp !== "N/A") {
+      if (order.otp && order.otp !== "Waiting..." && order.otp !== "N/A")
         grouped[dateStr].otps += 1;
-      }
-      if (
-        order.status === "Canceled & Refunded" ||
-        order.status === "Canceled"
-      ) {
+      if (order.status === "Canceled & Refunded" || order.status === "Canceled")
         grouped[dateStr].canceled += 1;
-      }
     });
 
     tbody.innerHTML = "";
@@ -1057,67 +1162,7 @@ async function openUserLifetimeModal(targetEmail) {
   }
 }
 
-// === CLOSE USER LIFETIME REPORT MODAL ===
 function closeUserLifetimeModal() {
   const modal = document.getElementById("userLifetimeModal");
-  if (modal) modal.classList.add("hidden");
-}
-
-// === OPEN ALL DAYS REPORT MODAL ===
-async function openAllDaysModal() {
-  const modal = document.getElementById("allDaysModal");
-  if (modal) modal.classList.remove("hidden");
-
-  const tbody = document.getElementById("allDaysReportTableBody");
-  if (!tbody || !_supabase || !loggedInUser) return;
-
-  const { data } = await _supabase
-    .from("orders")
-    .select("*")
-    .eq("user_email", loggedInUser.email)
-    .order("created_at", { ascending: false });
-
-  if (data && data.length > 0) {
-    const grouped = {};
-    data.forEach((order) => {
-      const dateStr = new Date(order.created_at).toISOString().split("T")[0];
-      if (!grouped[dateStr]) {
-        grouped[dateStr] = { bought: 0, otps: 0, canceled: 0 };
-      }
-      grouped[dateStr].bought += 1;
-      if (order.otp && order.otp !== "Waiting..." && order.otp !== "N/A") {
-        grouped[dateStr].otps += 1;
-      }
-      if (
-        order.status === "Canceled & Refunded" ||
-        order.status === "Canceled"
-      ) {
-        grouped[dateStr].canceled += 1;
-      }
-    });
-
-    tbody.innerHTML = "";
-    Object.keys(grouped).forEach((date) => {
-      const info = grouped[date];
-      const inv = info.otps * 20;
-      const row = document.createElement("tr");
-      row.className = "hover:bg-slate-50 transition";
-      row.innerHTML = `
-        <td class="py-3 px-4 font-mono text-xs font-bold text-slate-800">${date}</td>
-        <td class="py-3 px-4 text-blue-600 font-bold">${info.bought}</td>
-        <td class="py-3 px-4 text-emerald-600 font-bold">${info.otps}</td>
-        <td class="py-3 px-4 text-rose-600 font-bold">${info.canceled}</td>
-        <td class="py-3 px-4 text-amber-600 font-bold">৳${inv.toFixed(2)}</td>
-      `;
-      tbody.appendChild(row);
-    });
-  } else {
-    tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-400">No report history found.</td></tr>`;
-  }
-}
-
-// === CLOSE ALL DAYS REPORT MODAL ===
-function closeAllDaysModal() {
-  const modal = document.getElementById("allDaysModal");
   if (modal) modal.classList.add("hidden");
 }
