@@ -1,0 +1,926 @@
+<!doctype html>
+<html lang="bn">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TEAM NEXA - Professional Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Plus Jakarta Sans", sans-serif;
+      }
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateY(15px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .animate-slideUp {
+        animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+    </style>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body
+    class="bg-slate-50/75 min-h-screen flex flex-col md:flex-row text-slate-800 antialiased selection:bg-blue-600 selection:text-white"
+  >
+    <!-- LOGIN OVERLAY MODAL -->
+    <div
+      id="loginOverlay"
+      class="fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-50 flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 space-y-6"
+      >
+        <div class="text-center space-y-3">
+          <div
+            class="w-16 h-16 bg-blue-600 text-white rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-xl shadow-blue-600/25"
+          >
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <div>
+            <h2 class="text-2xl font-extrabold tracking-tight text-slate-900">
+              TEAM NEXA
+            </h2>
+            <p class="text-xs text-slate-500 font-medium mt-1">
+              Secure Multi-User Verification Portal
+            </p>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label
+              class="text-[11px] font-bold text-slate-400 uppercase tracking-wider"
+              >Email Address</label
+            >
+            <input
+              type="email"
+              id="loginEmail"
+              placeholder="admin@nexa.com"
+              class="w-full mt-1.5 px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+            />
+          </div>
+          <div>
+            <label
+              class="text-[11px] font-bold text-slate-400 uppercase tracking-wider"
+              >Password</label
+            >
+            <input
+              type="password"
+              id="loginPassword"
+              placeholder="••••••••"
+              class="w-full mt-1.5 px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+            />
+          </div>
+          <button
+            onclick="handleLogin()"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl shadow-lg shadow-blue-600/25 transition-all cursor-pointer active:scale-[0.99]"
+          >
+            Sign In to Dashboard
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN APP WRAPPER -->
+    <div
+      id="appMain"
+      class="hidden flex-1 flex flex-col md:flex-row min-h-screen w-full"
+    >
+      <!-- MOBILE TOP HEADER BAR -->
+      <div
+        class="md:hidden bg-[#090d16] text-white px-5 py-4 flex items-center justify-between border-b border-slate-800 shrink-0"
+      >
+        <div class="flex items-center gap-3">
+          <div class="bg-blue-600 text-white p-2.5 rounded-xl shadow-md">
+            <i class="fa-solid fa-shield-halved text-base"></i>
+          </div>
+          <div>
+            <span class="text-base font-extrabold tracking-wide block"
+              >TEAM NEXA</span
+            >
+            <span
+              id="mobileUserEmail"
+              class="text-[10px] text-emerald-400 font-semibold truncate block"
+              >admin@nexa.com</span
+            >
+          </div>
+        </div>
+        <button
+          onclick="toggleMobileSidebar()"
+          class="w-10 h-10 bg-slate-800 text-slate-300 rounded-xl flex items-center justify-center hover:bg-slate-700 transition"
+        >
+          <i class="fa-solid fa-bars text-lg"></i>
+        </button>
+      </div>
+
+      <!-- MOBILE SIDEBAR DRAWER OVERLAY -->
+      <div
+        id="mobileSidebarOverlay"
+        class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-40 hidden md:hidden"
+        onclick="toggleMobileSidebar()"
+      ></div>
+
+      <!-- Professional Sidebar (Desktop & Mobile Responsive Drawer) -->
+      <aside
+        id="sidebarDrawer"
+        class="fixed md:static inset-y-0 left-0 z-50 w-72 bg-[#090d16] text-slate-300 flex flex-col shrink-0 border-r border-slate-800/80 shadow-2xl transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out"
+      >
+        <div
+          class="p-6 flex items-center justify-between border-b border-slate-800/60"
+        >
+          <div class="flex items-center gap-3.5">
+            <div
+              class="bg-blue-600 text-white p-3 rounded-2xl shadow-lg shadow-blue-600/30 flex items-center justify-center font-bold"
+            >
+              <i class="fa-solid fa-shield-halved text-lg"></i>
+            </div>
+            <div class="min-w-0">
+              <span
+                class="text-lg font-extrabold tracking-wide text-white block"
+                >TEAM NEXA</span
+              >
+              <span
+                id="currentUserEmail"
+                class="text-[11px] text-emerald-400 font-semibold truncate block"
+                >admin@nexa.com</span
+              >
+            </div>
+          </div>
+          <!-- Close button for mobile -->
+          <button
+            onclick="toggleMobileSidebar()"
+            class="md:hidden text-slate-400 hover:text-white p-2"
+          >
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+
+        <!-- Balance Card -->
+        <div
+          class="p-5 mx-5 my-6 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-inner relative overflow-hidden"
+        >
+          <div
+            class="absolute -right-6 -bottom-6 text-slate-800/30 text-7xl font-black pointer-events-none"
+          >
+            <i class="fa-solid fa-wallet"></i>
+          </div>
+          <p
+            class="text-[11px] font-bold text-slate-400 uppercase tracking-wider"
+          >
+            Available Balance
+          </p>
+          <div class="flex items-center justify-between mt-2 relative z-10">
+            <span
+              id="sidebarBalance"
+              class="text-3xl font-black text-emerald-400 tracking-tight"
+              >৳0.00</span
+            >
+            <button
+              onclick="checkBalance()"
+              class="w-9 h-9 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl transition flex items-center justify-center shadow cursor-pointer"
+              title="Refresh Balance"
+            >
+              <i
+                class="fa-solid fa-arrows-rotate text-xs"
+                id="balanceSpinner"
+              ></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Nav Menu -->
+        <nav
+          class="flex-1 px-4 space-y-2 text-sm font-semibold overflow-y-auto"
+        >
+          <a
+            href="#"
+            id="navDashboard"
+            onclick="
+              switchTab('dashboard');
+              toggleMobileSidebarOnSelect();
+            "
+            class="flex items-center gap-3.5 px-4 py-3.5 rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/25 transition-all w-full text-left"
+          >
+            <i class="fa-solid fa-house w-5 text-center"></i>
+            <span>Dashboard</span>
+          </a>
+
+          <a
+            href="#"
+            id="navWhatsapp"
+            onclick="
+              switchTab('whatsapp');
+              toggleMobileSidebarOnSelect();
+            "
+            class="flex items-center gap-3.5 px-4 py-3.5 rounded-2xl hover:bg-slate-800/60 text-slate-300 hover:text-white transition-all w-full text-left"
+          >
+            <i
+              class="fa-brands fa-whatsapp w-5 text-center text-emerald-400 text-lg"
+            ></i>
+            <span class="flex-1">WhatsApp Service</span>
+            <span
+              class="bg-emerald-500/15 text-emerald-400 text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wide"
+              >Live</span
+            >
+          </a>
+          <a
+            href="#"
+            id="navReport"
+            onclick="
+              switchTab('report');
+              toggleMobileSidebarOnSelect();
+            "
+            class="flex items-center gap-3.5 px-4 py-3.5 rounded-2xl hover:bg-slate-800/60 text-slate-300 hover:text-white transition-all w-full text-left"
+          >
+            <i class="fa-solid fa-chart-line w-5 text-center text-blue-400"></i>
+            <span>Report Sheet</span>
+          </a>
+
+          <!-- ADMIN ONLY MENU -->
+          <a
+            href="#"
+            id="navAdminUsers"
+            onclick="
+              switchTab('adminUsers');
+              toggleMobileSidebarOnSelect();
+            "
+            class="hidden items-center gap-3.5 px-4 py-3.5 rounded-2xl hover:bg-slate-800/60 text-slate-300 hover:text-white transition-all border border-amber-500/20 w-full text-left"
+          >
+            <i class="fa-solid fa-user-gear w-5 text-center text-amber-400"></i>
+            <span>Manage Users</span>
+          </a>
+        </nav>
+
+        <!-- Logout -->
+        <div class="p-5 border-t border-slate-800/60">
+          <button
+            onclick="handleLogout()"
+            class="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold py-3 px-4 rounded-xl text-xs transition flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+          </button>
+        </div>
+
+        <div
+          class="p-4 text-[11px] text-slate-500 text-center border-t border-slate-800/40 font-medium"
+        >
+          Secure Enterprise Portal &copy; 2026
+        </div>
+      </aside>
+
+      <!-- Main Content Area -->
+      <div class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        <main
+          class="flex-1 p-4 sm:p-6 md:p-12 max-w-5xl w-full mx-auto space-y-8"
+        >
+          <!-- ================= DASHBOARD VIEW ================= -->
+          <div id="dashboardView" class="space-y-8">
+            <div
+              class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80"
+            >
+              <div>
+                <h1 class="text-2xl font-black text-slate-900 tracking-tight">
+                  Dashboard Overview
+                </h1>
+                <p class="text-xs text-slate-500 font-medium mt-1">
+                  Real-time stats and performance metrics for today.
+                </p>
+              </div>
+              <button
+                onclick="fetchDashboardStats()"
+                class="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl shadow-xs transition flex items-center justify-center sm:justify-start gap-2 cursor-pointer"
+              >
+                <i class="fa-solid fa-rotate-right"></i> Refresh Stats
+              </button>
+            </div>
+
+            <div
+              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
+            >
+              <!-- Card 1: Numbers Bought -->
+              <div
+                class="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4"
+              >
+                <div
+                  class="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-lg font-bold"
+                >
+                  <i class="fa-solid fa-cart-shopping"></i>
+                </div>
+                <div>
+                  <p
+                    class="text-xs font-bold text-slate-400 uppercase tracking-wider"
+                  >
+                    Numbers Bought
+                  </p>
+                  <h3
+                    id="statBought"
+                    class="text-3xl sm:text-4xl font-black text-slate-900 mt-2"
+                  >
+                    0
+                  </h3>
+                </div>
+              </div>
+
+              <!-- Card 2: OTPs Received -->
+              <div
+                class="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4"
+              >
+                <div
+                  class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-lg font-bold"
+                >
+                  <i class="fa-solid fa-key"></i>
+                </div>
+                <div>
+                  <p
+                    class="text-xs font-bold text-slate-400 uppercase tracking-wider"
+                  >
+                    OTPs Received
+                  </p>
+                  <h3
+                    id="statOtp"
+                    class="text-3xl sm:text-4xl font-black text-emerald-600 mt-2"
+                  >
+                    0
+                  </h3>
+                </div>
+              </div>
+
+              <!-- Card 3: Canceled Orders -->
+              <div
+                class="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4"
+              >
+                <div
+                  class="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center text-lg font-bold"
+                >
+                  <i class="fa-solid fa-ban"></i>
+                </div>
+                <div>
+                  <p
+                    class="text-xs font-bold text-slate-400 uppercase tracking-wider"
+                  >
+                    Canceled Orders
+                  </p>
+                  <h3
+                    id="statCanceled"
+                    class="text-3xl sm:text-4xl font-black text-rose-600 mt-2"
+                  >
+                    0
+                  </h3>
+                </div>
+              </div>
+
+              <!-- Card 4: Total Investment -->
+              <div
+                class="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4"
+              >
+                <div
+                  class="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-lg font-bold"
+                >
+                  <i class="fa-solid fa-wallet"></i>
+                </div>
+                <div>
+                  <p
+                    class="text-xs font-bold text-slate-400 uppercase tracking-wider"
+                  >
+                    Total Investment
+                  </p>
+                  <h3
+                    id="statInvestment"
+                    class="text-3xl sm:text-4xl font-black text-amber-600 mt-2"
+                  >
+                    ৳0.00
+                  </h3>
+                </div>
+              </div>
+            </div>
+            <!-- ================= LIVE SYSTEM ACTIVITY LOG ================= -->
+            <div
+              class="bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-800 shadow-xl space-y-4"
+            >
+              <div
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800"
+              >
+                <div class="flex items-center gap-3">
+                  <span class="relative flex h-3 w-3">
+                    <span
+                      class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"
+                    ></span>
+                    <span
+                      class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"
+                    ></span>
+                  </span>
+                  <h3 class="text-base font-extrabold text-white tracking-wide">
+                    Live Platform Activity Feed
+                  </h3>
+                </div>
+                <button
+                  onclick="fetchGlobalActivityLog()"
+                  class="text-slate-400 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition self-start sm:self-auto"
+                >
+                  <i class="fa-solid fa-arrows-rotate"></i> Refresh Feed
+                </button>
+              </div>
+
+              <!-- Terminal Style Activity Console -->
+              <div
+                style="max-height: 380px"
+                id="globalActivityLog"
+                class="font-mono text-xs space-y-2.5 max-h-[950px] overflow-y-auto pr-2 scrollbar-thin"
+              >
+                <div class="text-slate-500 italic py-2">
+                  Loading live platform activities...
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ================= WHATSAPP SERVICE VIEW ================= -->
+          <div id="whatsappView" class="hidden space-y-6">
+            <!-- Buy Section -->
+            <div
+              id="buySection"
+              class="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200/80 shadow-sm text-center space-y-5"
+            >
+              <div
+                class="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-inner border border-emerald-100"
+              >
+                <i class="fa-brands fa-whatsapp"></i>
+              </div>
+              <div class="space-y-1.5 max-w-md mx-auto">
+                <h2 class="text-2xl font-black text-slate-900">
+                  WhatsApp Verification Panel
+                </h2>
+                <p class="text-slate-500 text-sm font-medium">
+                  Instantly acquire clean, ready-to-use WhatsApp verification
+                  numbers via GetSMSWeb API.
+                </p>
+              </div>
+              <button
+                id="btnBuyNumber"
+                onclick="buyNumber()"
+                class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-8 py-4 rounded-2xl shadow-xl shadow-emerald-600/25 transition-all inline-flex items-center justify-center gap-3 cursor-pointer active:scale-[0.99]"
+              >
+                <i class="fa-solid fa-cart-shopping text-base"></i> Buy WhatsApp
+                Number
+              </button>
+            </div>
+
+            <!-- Active Order Card -->
+            <div
+              id="orderCard"
+              class="hidden bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden space-y-6 p-5 sm:p-6 md:p-8"
+            >
+              <div
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5"
+              >
+                <div class="flex items-center gap-4">
+                  <div
+                    class="bg-blue-50 text-blue-600 p-3 rounded-2xl border border-blue-100 shrink-0"
+                  >
+                    <i class="fa-solid fa-file-invoice text-xl"></i>
+                  </div>
+                  <div>
+                    <h2
+                      id="orderTitle"
+                      class="text-lg font-black text-slate-900"
+                    >
+                      Order #
+                    </h2>
+                    <div
+                      class="flex flex-wrap items-center gap-2 mt-1.5 text-xs font-semibold"
+                    >
+                      <span
+                        class="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-lg"
+                        ><i class="fa-brands fa-whatsapp"></i> WhatsApp</span
+                      >
+                      <span
+                        class="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg"
+                        ><i class="fa-solid fa-tag"></i> Service 198</span
+                      >
+                      <span
+                        id="orderTimestamp"
+                        class="bg-blue-50 text-blue-700 px-3 py-1 rounded-lg"
+                        ><i class="fa-regular fa-clock"></i> Just Now</span
+                      >
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onclick="resetToBuyView()"
+                  class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2 cursor-pointer self-start sm:self-auto"
+                >
+                  <i class="fa-solid fa-plus"></i> New Order
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div
+                  class="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4"
+                >
+                  <p
+                    class="text-[11px] font-bold text-slate-400 uppercase tracking-wider"
+                  >
+                    ACTIVATION ID
+                  </p>
+                  <p
+                    id="activationId"
+                    class="text-blue-600 font-mono font-bold text-base mt-1 break-all"
+                  >
+                    -
+                  </p>
+                </div>
+                <div
+                  class="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4"
+                >
+                  <p
+                    class="text-[11px] font-bold text-slate-400 uppercase tracking-wider"
+                  >
+                    ORDER STATUS
+                  </p>
+                  <p
+                    id="orderStatusText"
+                    class="text-emerald-600 font-bold text-base mt-1"
+                  >
+                    Confirmed
+                  </p>
+                </div>
+              </div>
+
+              <!-- Phone Number -->
+              <div class="space-y-1.5">
+                <label
+                  class="text-xs font-bold text-slate-400 uppercase tracking-wider"
+                  >PHONE NUMBER</label
+                >
+                <div
+                  class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/80 border border-slate-200 rounded-2xl px-5 py-4"
+                >
+                  <span
+                    id="phoneNumber"
+                    class="font-mono font-bold text-xl sm:text-2xl text-slate-900 break-all"
+                    >+--</span
+                  >
+                  <button
+                    onclick="copyText('phoneNumber')"
+                    class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer shadow-xs shrink-0"
+                  >
+                    <i class="fa-regular fa-copy"></i> Copy
+                  </button>
+                </div>
+              </div>
+
+              <!-- SMS CODE / OTP -->
+              <div class="space-y-1.5">
+                <label
+                  class="text-xs font-bold text-slate-400 uppercase tracking-wider"
+                  >SMS CODE / OTP</label
+                >
+                <div
+                  class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-50/60 border border-amber-200 rounded-2xl px-5 py-4"
+                >
+                  <span
+                    id="otpCode"
+                    class="font-mono font-extrabold text-xl sm:text-2xl text-emerald-600 tracking-wider break-all"
+                    >Waiting...</span
+                  >
+                  <button
+                    onclick="copyText('otpCode')"
+                    class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer shadow-xs shrink-0"
+                  >
+                    <i class="fa-regular fa-copy"></i> Copy
+                  </button>
+                </div>
+              </div>
+
+              <!-- Live Status Connection -->
+              <div
+                class="bg-blue-50/70 border border-blue-100 rounded-2xl p-4 flex items-center gap-3 text-blue-900 text-sm"
+              >
+                <div
+                  class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0"
+                >
+                  <i class="fa-solid fa-tower-broadcast animate-pulse"></i>
+                </div>
+                <div>
+                  <span class="font-bold">Live Status:</span>
+                  <span id="liveStatusText" class="font-medium"
+                    >Auto-checking for new SMS...</span
+                  >
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <button
+                  onclick="checkOTP()"
+                  class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 px-4 rounded-2xl text-sm transition shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <i class="fa-solid fa-rotate"></i> Check OTP Now
+                </button>
+                <button
+                  id="btnCancelOrder"
+                  onclick="cancelOrder()"
+                  class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold py-3.5 px-4 rounded-2xl text-sm transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <i class="fa-solid fa-ban"></i> Cancel & Refund
+                </button>
+              </div>
+            </div>
+
+            <!-- Order History Table Section -->
+            <div
+              id="historySection"
+              class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-5 sm:p-6 md:p-8 space-y-4"
+            >
+              <div
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4"
+              >
+                <div>
+                  <h3 class="text-lg font-black text-slate-900">
+                    Recent Order History
+                  </h3>
+                  <p class="text-xs text-slate-500 font-medium">
+                    Click "View" on any order to inspect details.
+                  </p>
+                </div>
+                <button
+                  onclick="fetchOrderHistory()"
+                  class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer self-start sm:self-auto"
+                >
+                  <i class="fa-solid fa-arrows-rotate"></i> Refresh History
+                </button>
+              </div>
+
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[600px]">
+                  <thead>
+                    <tr
+                      class="border-b border-slate-100 text-slate-400 text-xs uppercase tracking-wider font-bold"
+                    >
+                      <th class="py-3 px-4">ORDER ID</th>
+                      <th class="py-3 px-4">PHONE NUMBER</th>
+                      <th class="py-3 px-4">OTP</th>
+                      <th class="py-3 px-4">STATUS</th>
+                      <th class="py-3 px-4 text-center">ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody
+                    id="historyTableBody"
+                    class="divide-y divide-slate-100 text-sm font-semibold text-slate-700"
+                  >
+                    <tr>
+                      <td
+                        colspan="5"
+                        class="py-6 text-center text-slate-400 font-normal"
+                      >
+                        Loading history...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ================= ADMIN VIEW: MANAGE USERS ================= -->
+          <div id="adminUsersView" class="hidden space-y-8">
+            <div
+              class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200/80"
+            >
+              <div>
+                <h1 class="text-2xl font-black text-slate-900 tracking-tight">
+                  Manage System Users
+                </h1>
+                <p class="text-xs text-slate-500 font-medium mt-1">
+                  Create new accounts, update roles, or manage active users.
+                </p>
+              </div>
+            </div>
+
+            <!-- Create User Card -->
+            <div
+              class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-sm space-y-6"
+            >
+              <div class="flex items-center gap-3">
+                <div
+                  class="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center font-bold shrink-0"
+                >
+                  <i class="fa-solid fa-user-plus"></i>
+                </div>
+                <div>
+                  <h2 class="text-lg font-extrabold text-slate-900">
+                    Create New Account
+                  </h2>
+                  <p class="text-xs text-slate-400 font-medium">
+                    Add a new client or admin user to the dashboard.
+                  </p>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label
+                    class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1"
+                    >User Email</label
+                  >
+                  <input
+                    type="email"
+                    id="newUserEmail"
+                    placeholder="user@nexa.com"
+                    class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                  />
+                </div>
+                <div>
+                  <label
+                    class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1"
+                    >Password</label
+                  >
+                  <input
+                    type="password"
+                    id="newUserPassword"
+                    placeholder="••••••••"
+                    class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                  />
+                </div>
+              </div>
+
+              <button
+                onclick="createNewUser()"
+                class="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white font-bold px-6 py-3.5 rounded-2xl shadow-md shadow-amber-500/20 text-sm transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-2"
+              >
+                <i class="fa-solid fa-plus text-xs"></i> Create User Account
+              </button>
+            </div>
+
+            <!-- Users Table Card -->
+            <div
+              class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-5 sm:p-6 md:p-8 space-y-4"
+            >
+              <div
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2"
+              >
+                <h3 class="text-lg font-extrabold text-slate-900">
+                  All Registered Users
+                </h3>
+                <button
+                  onclick="loadAllUsersAdmin()"
+                  class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3.5 py-2 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer self-start sm:self-auto"
+                >
+                  <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                </button>
+              </div>
+
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[650px]">
+                  <thead>
+                    <tr
+                      class="border-b border-slate-100 text-slate-400 text-xs uppercase tracking-wider font-bold"
+                    >
+                      <th class="py-3 px-4">USER EMAIL</th>
+                      <th class="py-3 px-4">ROLE</th>
+                      <th class="py-3 px-4">CREATED AT</th>
+                      <th class="py-3 px-4 text-center">ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody
+                    id="adminUsersTableBody"
+                    class="divide-y divide-slate-100 text-sm font-semibold text-slate-700"
+                  >
+                    <tr>
+                      <td
+                        colspan="4"
+                        class="py-6 text-center text-slate-400 font-normal"
+                      >
+                        Loading user profiles...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div
+            id="statusToast"
+            class="hidden p-4 rounded-2xl text-sm font-semibold text-center shadow-md"
+          ></div>
+
+          <!-- ================= REPORT SHEET VIEW ================= -->
+          <div id="reportView" class="hidden space-y-6">
+            <div class="pb-4 border-b border-slate-200/80">
+              <h1 class="text-2xl font-black text-slate-900 tracking-tight">
+                Performance Report Sheet
+              </h1>
+              <p class="text-xs text-slate-500 font-medium mt-1">
+                Top performers leaderboard for today.
+              </p>
+            </div>
+
+            <!-- 1st Place Winner Featured Card -->
+            <div id="topWinnerCard" class="hidden"></div>
+
+            <!-- Other Users List -->
+            <div
+              class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 space-y-4"
+            >
+              <h3
+                class="text-base font-extrabold text-slate-900 pb-3 border-b border-slate-100"
+              >
+                Other Performers
+              </h3>
+              <div id="otherUsersList" class="space-y-3">
+                <div class="text-center py-4 text-slate-400 text-sm">
+                  Loading performers...
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- USER LIFETIME REPORT MODAL -->
+          <div
+            id="userLifetimeModal"
+            class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4"
+          >
+            <div
+              class="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl border border-slate-100 space-y-6 max-h-[90vh] overflow-y-auto"
+            >
+              <div
+                class="flex items-center justify-between pb-3 border-b border-slate-100"
+              >
+                <div>
+                  <h3 class="text-lg font-extrabold text-slate-900">
+                    User Lifetime Report
+                  </h3>
+                  <p
+                    id="modalUserEmail"
+                    class="text-xs text-blue-600 font-bold mt-0.5"
+                  ></p>
+                </div>
+                <button
+                  onclick="closeUserLifetimeModal()"
+                  class="text-slate-400 hover:text-slate-700 text-lg p-1 cursor-pointer"
+                >
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[550px]">
+                  <thead>
+                    <tr
+                      class="border-b border-slate-100 text-slate-400 text-xs uppercase tracking-wider font-bold"
+                    >
+                      <th class="py-3 px-4">DATE</th>
+                      <th class="py-3 px-4">BOUGHT</th>
+                      <th class="py-3 px-4">OTPS</th>
+                      <th class="py-3 px-4">CANCELED</th>
+                      <th class="py-3 px-4">INVESTMENT</th>
+                    </tr>
+                  </thead>
+                  <tbody
+                    id="userLifetimeTableBody"
+                    class="divide-y divide-slate-100 text-sm font-semibold text-slate-700"
+                  >
+                    <tr>
+                      <td colspan="5" class="py-6 text-center text-slate-400">
+                        Loading user history...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      // Helper script for mobile sidebar toggle drawer
+      function toggleMobileSidebar() {
+        const drawer = document.getElementById("sidebarDrawer");
+        const overlay = document.getElementById("mobileSidebarOverlay");
+        drawer.classList.toggle("-translate-x-full");
+        overlay.classList.toggle("hidden");
+      }
+      function toggleMobileSidebarOnSelect() {
+        if (window.innerWidth < 768) {
+          toggleMobileSidebar();
+        }
+      }
+    </script>
+    <script src="script.js"></script>
+  </body>
+</html>
