@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TEAM NEXA - Professional Panel</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link
       rel="stylesheet"
@@ -262,6 +263,25 @@
               >Live</span
             >
           </a>
+          <!-- Canada Stock Service Sidebar Nav Item -->
+          <a
+            href="#"
+            id="navCanada"
+            onclick="
+              switchTab('canada');
+              toggleMobileSidebarOnSelect();
+            "
+            class="flex items-center gap-3.5 px-4 py-3.5 rounded-2xl hover:bg-slate-800/60 text-slate-300 hover:text-white transition-all w-full text-left"
+          >
+            <i
+              class="fa-solid fa-globe w-5 text-center text-blue-400 text-lg"
+            ></i>
+            <span class="flex-1">Canada Stock</span>
+            <span
+              class="bg-blue-500/15 text-blue-400 text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wide"
+              >Stock</span
+            >
+          </a>
           <a
             href="#"
             id="navReport"
@@ -333,105 +353,190 @@
               </button>
             </div>
 
-            <div
-              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
-            >
-              <!-- Card 1: Numbers Bought -->
-              <div
-                class="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4"
+            <!-- 🇨🇦 CANADA STOCK STATS (New Section Added Above WhatsApp) -->
+            <div class="mb-6">
+              <h3
+                class="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2"
               >
+                <i class="fa-solid fa-earth-americas text-blue-500"></i> Canada
+                Stock Stats (Today)
+              </h3>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <!-- Canada Numbers Bought -->
                 <div
-                  class="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-lg font-bold"
+                  class="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs flex items-center gap-4"
                 >
-                  <i class="fa-solid fa-cart-shopping"></i>
-                </div>
-                <div>
-                  <p
-                    class="text-xs font-bold text-slate-400 uppercase tracking-wider"
+                  <div
+                    class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl shadow-xs"
                   >
-                    Numbers Bought
-                  </p>
-                  <h3
-                    id="statBought"
-                    class="text-3xl sm:text-4xl font-black text-slate-900 mt-2"
-                  >
-                    0
-                  </h3>
+                    <i class="fa-solid fa-cart-shopping"></i>
+                  </div>
+                  <div>
+                    <span
+                      class="text-xs font-bold text-slate-400 uppercase tracking-wider block"
+                      >NUMBERS BOUGHT</span
+                    >
+                    <span
+                      id="statCanadaBought"
+                      class="text-2xl font-black text-slate-900"
+                      >0</span
+                    >
+                  </div>
                 </div>
-              </div>
 
-              <!-- Card 2: OTPs Received -->
-              <div
-                class="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4"
-              >
+                <!-- Canada Canceled Orders -->
                 <div
-                  class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-lg font-bold"
+                  class="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs flex items-center gap-4"
                 >
-                  <i class="fa-solid fa-key"></i>
-                </div>
-                <div>
-                  <p
-                    class="text-xs font-bold text-slate-400 uppercase tracking-wider"
+                  <div
+                    class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl shadow-xs"
                   >
-                    OTPs Received
-                  </p>
-                  <h3
-                    id="statOtp"
-                    class="text-3xl sm:text-4xl font-black text-emerald-600 mt-2"
-                  >
-                    0
-                  </h3>
+                    <i class="fa-solid fa-ban"></i>
+                  </div>
+                  <div>
+                    <span
+                      class="text-xs font-bold text-slate-400 uppercase tracking-wider block"
+                      >CANCELED ORDERS</span
+                    >
+                    <span
+                      id="statCanadaCanceled"
+                      class="text-2xl font-black text-slate-900"
+                      >0</span
+                    >
+                  </div>
                 </div>
-              </div>
 
-              <!-- Card 3: Canceled Orders -->
-              <div
-                class="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4"
-              >
+                <!-- Canada Total Spent ($0.12 rate) -->
                 <div
-                  class="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center text-lg font-bold"
+                  class="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs flex items-center gap-4"
                 >
-                  <i class="fa-solid fa-ban"></i>
-                </div>
-                <div>
-                  <p
-                    class="text-xs font-bold text-slate-400 uppercase tracking-wider"
+                  <div
+                    class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl shadow-xs"
                   >
-                    Canceled Orders
-                  </p>
-                  <h3
-                    id="statCanceled"
-                    class="text-3xl sm:text-4xl font-black text-rose-600 mt-2"
-                  >
-                    0
-                  </h3>
-                </div>
-              </div>
-
-              <!-- Card 4: Total Investment -->
-              <div
-                class="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4"
-              >
-                <div
-                  class="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-lg font-bold"
-                >
-                  <i class="fa-solid fa-wallet"></i>
-                </div>
-                <div>
-                  <p
-                    class="text-xs font-bold text-slate-400 uppercase tracking-wider"
-                  >
-                    Total Investment
-                  </p>
-                  <h3
-                    id="statInvestment"
-                    class="text-3xl sm:text-4xl font-black text-amber-600 mt-2"
-                  >
-                    ৳0.00
-                  </h3>
+                    <i class="fa-solid fa-wallet"></i>
+                  </div>
+                  <div>
+                    <span
+                      class="text-xs font-bold text-slate-400 uppercase tracking-wider block"
+                      >TOTAL SPENT</span
+                    >
+                    <span
+                      id="statCanadaSpent"
+                      class="text-2xl font-black text-amber-600"
+                      >$0.00</span
+                    >
+                  </div>
                 </div>
               </div>
             </div>
+            <div>
+              <h3
+                class="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2"
+              >
+                <i class="fa-solid fa-earth-americas text-blue-500"></i> USA
+                Stock Stats (Today)
+              </h3>
+              <div
+                class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
+              >
+                <!-- Card 1: Numbers Bought -->
+                <div
+                  class="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4"
+                >
+                  <div
+                    class="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-lg font-bold"
+                  >
+                    <i class="fa-solid fa-cart-shopping"></i>
+                  </div>
+                  <div>
+                    <p
+                      class="text-xs font-bold text-slate-400 uppercase tracking-wider"
+                    >
+                      Numbers Bought
+                    </p>
+                    <h3
+                      id="statBought"
+                      class="text-3xl sm:text-4xl font-black text-slate-900 mt-2"
+                    >
+                      0
+                    </h3>
+                  </div>
+                </div>
+
+                <!-- Card 2: OTPs Received -->
+                <div
+                  class="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4"
+                >
+                  <div
+                    class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-lg font-bold"
+                  >
+                    <i class="fa-solid fa-key"></i>
+                  </div>
+                  <div>
+                    <p
+                      class="text-xs font-bold text-slate-400 uppercase tracking-wider"
+                    >
+                      OTPs Received
+                    </p>
+                    <h3
+                      id="statOtp"
+                      class="text-3xl sm:text-4xl font-black text-emerald-600 mt-2"
+                    >
+                      0
+                    </h3>
+                  </div>
+                </div>
+
+                <!-- Card 3: Canceled Orders -->
+                <div
+                  class="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4"
+                >
+                  <div
+                    class="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center text-lg font-bold"
+                  >
+                    <i class="fa-solid fa-ban"></i>
+                  </div>
+                  <div>
+                    <p
+                      class="text-xs font-bold text-slate-400 uppercase tracking-wider"
+                    >
+                      Canceled Orders
+                    </p>
+                    <h3
+                      id="statCanceled"
+                      class="text-3xl sm:text-4xl font-black text-rose-600 mt-2"
+                    >
+                      0
+                    </h3>
+                  </div>
+                </div>
+
+                <!-- Card 4: Total Investment -->
+                <div
+                  class="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4"
+                >
+                  <div
+                    class="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-lg font-bold"
+                  >
+                    <i class="fa-solid fa-wallet"></i>
+                  </div>
+                  <div>
+                    <p
+                      class="text-xs font-bold text-slate-400 uppercase tracking-wider"
+                    >
+                      Total Investment
+                    </p>
+                    <h3
+                      id="statInvestment"
+                      class="text-3xl sm:text-4xl font-black text-amber-600 mt-2"
+                    >
+                      ৳0.00
+                    </h3>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- ================= LIVE SYSTEM ACTIVITY LOG ================= -->
             <div
               class="bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-800 shadow-xl space-y-4"
@@ -720,6 +825,226 @@
             </div>
           </div>
 
+          <!-- ================= CANADA NUMBER SERVICE VIEW ================= -->
+          <div id="canadaView" class="hidden space-y-6">
+            <!-- Buy Canada Panel Card -->
+            <div
+              id="canadaBuySection"
+              class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 sm:p-8 text-center space-y-5 max-w-2xl mx-auto"
+            >
+              <div
+                class="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-inner border border-blue-100"
+              >
+                <i class="fa-solid fa-globe"></i>
+              </div>
+              <div class="space-y-1">
+                <h3 class="text-xl font-black text-slate-900">
+                  Canada Number Service
+                </h3>
+                <p class="text-slate-500 text-xs font-medium">
+                  Acquire stocked Canada verification numbers directly from
+                  database inventory with instant stock link.
+                </p>
+              </div>
+              <button
+                id="btnTriggerBuyCanada"
+                onclick="buyCanadaNumber()"
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3.5 rounded-2xl shadow-lg shadow-blue-600/25 transition-all inline-flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+              >
+                <i class="fa-solid fa-cart-shopping text-sm"></i> Buy Canada
+                Number
+              </button>
+            </div>
+
+            <!-- Canada Active Order Card (Hidden Initially) -->
+            <div
+              id="canadaOrderCard"
+              class="hidden bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden space-y-6 p-5 sm:p-6 md:p-8 max-w-3xl mx-auto"
+            >
+              <div
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5"
+              >
+                <div class="flex items-center gap-4">
+                  <div
+                    class="bg-blue-50 text-blue-600 p-3 rounded-2xl border border-blue-100 shrink-0"
+                  >
+                    <i class="fa-solid fa-file-invoice text-xl"></i>
+                  </div>
+                  <div>
+                    <h2
+                      id="canadaOrderTitle"
+                      class="text-lg font-black text-slate-900"
+                    >
+                      Canada Order #
+                    </h2>
+                    <div
+                      class="flex flex-wrap items-center gap-2 mt-1.5 text-xs font-semibold"
+                    >
+                      <span
+                        class="bg-blue-50 text-blue-700 px-3 py-1 rounded-lg"
+                        ><i class="fa-solid fa-globe"></i> Canada Stock</span
+                      >
+                      <span
+                        id="canadaOrderTimestamp"
+                        class="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg"
+                        ><i class="fa-regular fa-clock"></i> Just Now</span
+                      >
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onclick="resetCanadaBuyView()"
+                  class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <i class="fa-solid fa-plus"></i> New Order
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div
+                  class="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4"
+                >
+                  <p
+                    class="text-[11px] font-bold text-slate-400 uppercase tracking-wider"
+                  >
+                    ORDER ID
+                  </p>
+                  <p
+                    id="canadaActivationId"
+                    class="text-blue-600 font-mono font-bold text-base mt-1 break-all"
+                  >
+                    -
+                  </p>
+                </div>
+                <div
+                  class="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4"
+                >
+                  <p
+                    class="text-[11px] font-bold text-slate-400 uppercase tracking-wider"
+                  >
+                    STATUS
+                  </p>
+                  <p
+                    id="canadaOrderStatusText"
+                    class="text-blue-600 font-bold text-base mt-1"
+                  >
+                    Confirmed
+                  </p>
+                </div>
+              </div>
+
+              <!-- Phone Number -->
+              <div class="space-y-1.5">
+                <label
+                  class="text-xs font-bold text-slate-400 uppercase tracking-wider"
+                  >PHONE NUMBER</label
+                >
+                <div
+                  class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/80 border border-slate-200 rounded-2xl px-5 py-4"
+                >
+                  <span
+                    id="canadaPhoneNumber"
+                    class="font-mono font-bold text-xl sm:text-2xl text-slate-900 break-all"
+                    >+--</span
+                  >
+                  <button
+                    onclick="copyText('canadaPhoneNumber')"
+                    class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer shadow-xs shrink-0"
+                  >
+                    <i class="fa-regular fa-copy"></i> Copy
+                  </button>
+                </div>
+              </div>
+
+              <!-- Stock Link / OTP -->
+              <div class="space-y-1.5">
+                <label
+                  class="text-xs font-bold text-slate-400 uppercase tracking-wider"
+                  >STOCK LINK / OTP</label
+                >
+                <div
+                  class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-blue-50/60 border border-blue-200 rounded-2xl px-5 py-4"
+                >
+                  <span
+                    id="canadaOtpCode"
+                    class="font-mono font-extrabold text-xs sm:text-sm text-blue-700 tracking-wide break-all"
+                    >-</span
+                  >
+                  <button
+                    onclick="copyText('canadaOtpCode')"
+                    class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer shadow-xs shrink-0"
+                  >
+                    <i class="fa-regular fa-copy"></i> Copy Link
+                  </button>
+                </div>
+              </div>
+
+              <div class="pt-2">
+                <button
+                  id="canadaBtnCancelOrder"
+                  onclick="cancelCanadaActiveOrder()"
+                  class="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold py-3.5 px-4 rounded-2xl text-sm transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <i class="fa-solid fa-ban"></i> Cancel & Refund Canada Order
+                </button>
+              </div>
+            </div>
+
+            <!-- Canada Order History Table Section -->
+            <div
+              id="canadaHistorySection"
+              class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-5 sm:p-6 md:p-8 space-y-4"
+            >
+              <div
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4"
+              >
+                <div>
+                  <h3 class="text-lg font-black text-slate-900">
+                    Canada Order History
+                  </h3>
+                  <p class="text-xs text-slate-500 font-medium">
+                    Dedicated records for your Canada stock purchases.
+                  </p>
+                </div>
+                <button
+                  onclick="fetchCanadaHistory()"
+                  class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer self-start sm:self-auto"
+                >
+                  <i class="fa-solid fa-arrows-rotate"></i> Refresh History
+                </button>
+              </div>
+
+              <div class="overflow-x-auto max-h-[350px] overflow-y-auto pr-1">
+                <table class="w-full text-left border-collapse min-w-[600px]">
+                  <thead class="sticky top-0 bg-white z-10">
+                    <tr
+                      class="border-b border-slate-100 text-slate-400 text-xs uppercase tracking-wider font-bold"
+                    >
+                      <th class="py-3 px-4">ORDER ID</th>
+                      <th class="py-3 px-4">PHONE NUMBER</th>
+                      <th class="py-3 px-4">STOCK LINK</th>
+                      <th class="py-3 px-4">STATUS</th>
+                      <th class="py-3 px-4 text-center">ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody
+                    id="canadaHistoryTableBody"
+                    class="divide-y divide-slate-100 text-sm font-semibold text-slate-700"
+                  >
+                    <tr>
+                      <td
+                        colspan="5"
+                        class="py-6 text-center text-slate-400 font-normal"
+                      >
+                        Loading Canada history...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
           <!-- ================= ADMIN VIEW: MANAGE USERS ================= -->
           <div id="adminUsersView" class="hidden space-y-8">
             <div
@@ -790,6 +1115,123 @@
               </button>
             </div>
 
+            <!-- BULK WHATSAPP NUMBER & LINK ADD CARD -->
+            <div
+              class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-sm space-y-6"
+            >
+              <div class="flex items-center gap-3">
+                <div
+                  class="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center font-bold shrink-0"
+                >
+                  <i class="fa-brands fa-whatsapp text-lg"></i>
+                </div>
+                <div>
+                  <h2 class="text-lg font-extrabold text-slate-900">
+                    Add WhatsApp Numbers & Links
+                  </h2>
+                  <p class="text-xs text-slate-400 font-medium">
+                    Upload Excel/CSV sheet or input multiple numbers with links.
+                  </p>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Excel / CSV Upload Box -->
+                <div class="space-y-2">
+                  <label
+                    class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block"
+                    >Upload Sheet (.xlsx, .csv)</label
+                  >
+                  <div
+                    class="border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center hover:border-emerald-500 transition-all bg-slate-50/50"
+                  >
+                    <i
+                      class="fa-solid fa-file-excel text-emerald-600 text-3xl mb-2"
+                    ></i>
+                    <input
+                      type="file"
+                      id="sheetFileInput"
+                      accept=".csv, .xlsx, .xls"
+                      class="hidden"
+                      onchange="handleSheetUpload(event)"
+                    />
+                    <button
+                      onclick="
+                        document.getElementById('sheetFileInput').click()
+                      "
+                      class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md transition cursor-pointer block mx-auto"
+                    >
+                      <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Select
+                      Sheet File
+                    </button>
+                    <span
+                      id="selectedFileName"
+                      class="text-[11px] text-slate-500 block mt-2 font-medium"
+                      >No file chosen</span
+                    >
+                  </div>
+                </div>
+
+                <!-- Manual Bulk Input Textarea -->
+                <div class="space-y-2">
+                  <label
+                    class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block"
+                    >Manual Bulk Input (Format: Number, Link)</label
+                  >
+                  <textarea
+                    id="bulkNumberInput"
+                    rows="4"
+                    placeholder="+8801700000000, https://chat.whatsapp.com/example1&#10;+8801800000000, https://chat.whatsapp.com/example2"
+                    class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono focus:outline-none focus:border-emerald-600 focus:bg-white transition-all"
+                  ></textarea>
+                </div>
+              </div>
+
+              <div
+                class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-slate-100"
+              >
+                <span
+                  id="parsedCountBadge"
+                  class="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl"
+                  >Total Items: 0</span
+                >
+                <button
+                  onclick="submitBulkWhatsAppNumbers()"
+                  class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3.5 rounded-2xl shadow-md shadow-emerald-600/20 text-sm transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <i class="fa-solid fa-database text-xs"></i> Save Numbers to
+                  Database
+                </button>
+              </div>
+
+              <!-- Parsed Numbers Preview Table -->
+              <div id="parsedPreviewSection" class="hidden space-y-3 pt-2">
+                <h4
+                  class="text-xs font-extrabold text-slate-700 uppercase tracking-wider"
+                >
+                  Data Preview
+                </h4>
+                <div
+                  class="max-h-48 overflow-y-auto border border-slate-100 rounded-2xl"
+                >
+                  <table class="w-full text-left text-xs">
+                    <thead
+                      class="bg-slate-50 text-slate-400 font-bold uppercase sticky top-0"
+                    >
+                      <tr>
+                        <th class="py-2.5 px-3">#</th>
+                        <th class="py-2.5 px-3">Phone Number</th>
+                        <th class="py-2.5 px-3">WhatsApp Link</th>
+                      </tr>
+                    </thead>
+                    <tbody
+                      id="parsedPreviewTableBody"
+                      class="divide-y divide-slate-100 font-mono"
+                    ></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
             <!-- ALL REGISTERED USERS TABLE -->
             <div
               class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 space-y-4"

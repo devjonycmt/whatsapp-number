@@ -26,8 +26,9 @@ const loginOverlay = document.getElementById("loginOverlay");
 const appMain = document.getElementById("appMain");
 const currentUserEmail = document.getElementById("currentUserEmail");
 const navAdminUsers = document.getElementById("navAdminUsers");
-
+const canadaView = document.getElementById("canadaView"); // নতুন যোগ করা হলো
 const dashboardView = document.getElementById("dashboardView");
+const navCanada = document.getElementById("navCanada"); // নতুন যোগ করা হলো
 const whatsappView = document.getElementById("whatsappView");
 const adminUsersView = document.getElementById("adminUsersView");
 const reportView = document.getElementById("reportView");
@@ -423,8 +424,11 @@ function switchTab(tab) {
     }
   }
 
+  // ১. সব ভিউ উপাদান হাইড করা
   dashboardView.classList.add("hidden");
   whatsappView.classList.add("hidden");
+  if (typeof canadaView !== "undefined" && canadaView)
+    canadaView.classList.add("hidden");
   adminUsersView.classList.add("hidden");
   if (reportView) reportView.classList.add("hidden");
 
@@ -433,12 +437,16 @@ function switchTab(tab) {
   const inactiveNav =
     "flex items-center gap-3.5 px-4 py-3.5 rounded-2xl hover:bg-slate-800/60 text-slate-300 hover:text-white transition-all w-full text-left";
 
+  // ২. সব সাইডবার বাটনের স্টাইল ইন-অ্যাক্টিভ করা
   if (navDashboard) navDashboard.className = inactiveNav;
   if (navWhatsapp) navWhatsapp.className = inactiveNav;
+  if (typeof navCanada !== "undefined" && navCanada)
+    navCanada.className = inactiveNav;
   if (navReport) navReport.className = inactiveNav;
   if (navAdminUsers)
     navAdminUsers.className = inactiveNav + " border border-amber-500/20";
 
+  // ৩. সিলেক্টেড ট্যাব অনুযায়ী ভিউ ওপেন করা
   if (tab === "dashboard") {
     dashboardView.classList.remove("hidden");
     if (navDashboard) navDashboard.className = activeNav;
@@ -456,6 +464,26 @@ function switchTab(tab) {
     } else {
       if (historySection) historySection.classList.remove("hidden");
       fetchOrderHistory();
+    }
+  } else if (tab === "canada") {
+    // 🇨🇦 Canada Stock Tab Logic
+    if (typeof canadaView !== "undefined" && canadaView)
+      canadaView.classList.remove("hidden");
+    if (typeof navCanada !== "undefined" && navCanada)
+      navCanada.className = activeNav;
+    updateUserLimitSidebar();
+
+    // Canada Active Order Card বা History Toggle হ্যান্ডলিং
+    const canadaOrderCard = document.getElementById("canadaOrderCard");
+    const canadaHistorySection = document.getElementById(
+      "canadaHistorySection",
+    );
+
+    if (canadaOrderCard && !canadaOrderCard.classList.contains("hidden")) {
+      if (canadaHistorySection) canadaHistorySection.classList.add("hidden");
+    } else {
+      if (canadaHistorySection) canadaHistorySection.classList.remove("hidden");
+      if (typeof fetchCanadaHistory === "function") fetchCanadaHistory();
     }
   } else if (tab === "report") {
     if (reportView) reportView.classList.remove("hidden");
@@ -947,6 +975,7 @@ async function checkForNewActivity() {
   }
 }
 
+// === ৪. FETCH GLOBAL ACTIVITY LOG (Updated to Support Canada Activities) ===
 async function fetchGlobalActivityLog() {
   const container = document.getElementById("globalActivityLog");
   if (!container || !_supabase) return;
@@ -977,6 +1006,17 @@ async function fetchGlobalActivityLog() {
       } else if (item.action_type === "OTP_RECEIVED") {
         badge = `<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-bold">OTP RECEIVED</span>`;
         actionText = `received OTP <span class="text-emerald-300 font-bold">[${item.otp_code}]</span> for <span class="text-slate-300">${item.phone_number || ""}</span>`;
+      }
+      // 🇨🇦 ক্যানাডা স্টক অ্যাক্টিভিটি ব্যাজ ও টেক্সট ডিজাইন
+      else if (item.action_type === "CANADA_NEW_ORDER") {
+        badge = `<span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded text-[10px] font-bold">CANADA ORDER</span>`;
+        actionText = `purchased Canada stock number <span class="text-slate-300">${item.phone_number || ""}</span> (#${item.order_id || ""})`;
+      } else if (item.action_type === "CANADA_CANCELED") {
+        badge = `<span class="bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded text-[10px] font-bold">CANADA CANCELED</span>`;
+        actionText = `canceled Canada order <span class="text-slate-300">#${item.order_id || ""}</span> (${item.phone_number || ""})`;
+      } else if (item.action_type === "CANADA_SUCCESS") {
+        badge = `<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-bold">CANADA SUCCESS</span>`;
+        actionText = `marked Canada order <span class="text-slate-300">#${item.order_id || ""}</span> as success (${item.phone_number || ""})`;
       } else {
         badge = `<span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded text-[10px] font-bold">NEW ORDER</span>`;
         actionText = `purchased WhatsApp number <span class="text-slate-300">${item.phone_number || ""}</span>`;
@@ -1001,7 +1041,7 @@ async function fetchGlobalActivityLog() {
     container.innerHTML = `<div class="text-slate-500 italic py-2">No platform activity recorded yet.</div>`;
   }
 }
-
+// === LOAD ALL USERS REPORT SHEET (Total Spent = Numbers Bought * 0.12$) ===
 async function loadAllUserReportSheet() {
   if (!_supabase) return;
   const todayStr = new Date().toISOString().split("T")[0];
@@ -1012,33 +1052,39 @@ async function loadAllUserReportSheet() {
   const { data: usersData } = await _supabase
     .from("user_profiles")
     .select("email");
-  const { data: ordersData } = await _supabase
-    .from("orders")
+
+  const { data: canadaOrdersData } = await _supabase
+    .from("canada_orders")
     .select("*")
     .gte("created_at", todayStr);
 
   if (usersData && usersData.length > 0) {
     const userReports = usersData.map((user) => {
-      const userOrders = ordersData
-        ? ordersData.filter((o) => o.user_email === user.email)
+      const userCanadaOrders = canadaOrdersData
+        ? canadaOrdersData.filter((o) => o.user_email === user.email)
         : [];
-      let bought = userOrders.length;
-      let otps = userOrders.filter(
-        (o) => o.otp && o.otp !== "Waiting..." && o.otp !== "N/A",
+
+      let bought = userCanadaOrders.filter(
+        (o) => !o.status || !o.status.toLowerCase().includes("cancel"),
       ).length;
-      let canceled = userOrders.filter(
-        (o) => o.status === "Canceled & Refunded" || o.status === "Canceled",
+      let otps = userCanadaOrders.filter(
+        (o) => o.status && o.status.toLowerCase().includes("success"),
       ).length;
-      let investment = otps * 20;
+      let canceled = userCanadaOrders.filter(
+        (o) => o.status && o.status.toLowerCase().includes("cancel"),
+      ).length;
+
+      // 🟢 Numbers Bought কে 0.12$ দিয়ে গুণ করে Total Spent হিসাব করা হলো
+      let investment = bought * 0.12;
 
       return { email: user.email, bought, otps, canceled, investment };
     });
 
-    userReports.sort((a, b) => b.investment - a.investment);
+    userReports.sort((a, b) => b.bought - a.bought || b.otps - a.otps);
     const firstUser = userReports[0];
     const otherUsers = userReports.slice(1);
 
-    if (firstUser && firstUser.investment > 0) {
+    if (firstUser && firstUser.bought > 0) {
       topWinnerCard.classList.remove("hidden");
       topWinnerCard.innerHTML = `
         <div class="bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl border border-amber-500/40 relative overflow-hidden flex flex-col items-center text-center">
@@ -1050,7 +1096,7 @@ async function loadAllUserReportSheet() {
             <i class="fa-solid fa-star text-amber-400 text-xs absolute -bottom-1 bg-slate-950 rounded-full p-0.5 border border-amber-400"></i>
           </div>
           <span class="text-[11px] uppercase tracking-widest text-amber-400 font-extrabold mt-1 mb-1 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-            <i class="fa-solid fa-crown mr-1 text-amber-400"></i> Top Performer of Today
+            <i class="fa-solid fa-crown mr-1 text-amber-400"></i> Top Performer of Today (Canada Stock)
           </span>
           <h2 class="text-xl sm:text-2xl font-black text-white mb-2">${firstUser.email}</h2>
           <button onclick="openUserLifetimeModal('${firstUser.email}')" class="mb-4 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5">
@@ -1062,7 +1108,7 @@ async function loadAllUserReportSheet() {
               <span class="text-blue-400 font-black text-base">${firstUser.bought}</span>
             </div>
             <div class="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
-              <span class="text-slate-400 block mb-1 font-medium">OTPs Received</span>
+              <span class="text-slate-400 block mb-1 font-medium">Success Completed</span>
               <span class="text-emerald-400 font-black text-base">${firstUser.otps}</span>
             </div>
             <div class="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
@@ -1071,7 +1117,7 @@ async function loadAllUserReportSheet() {
             </div>
             <div class="bg-slate-950/60 p-3.5 rounded-2xl border border-amber-500/30 bg-amber-500/5">
               <span class="text-amber-300 block mb-1 font-medium">Total Spent</span>
-              <span class="text-amber-400 font-black text-base">৳${firstUser.investment.toFixed(2)}</span>
+              <span class="text-amber-400 font-black text-base">$${firstUser.investment.toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -1092,14 +1138,14 @@ async function loadAllUserReportSheet() {
             <span class="w-9 h-9 rounded-xl bg-slate-200/80 text-slate-700 font-black text-xs flex items-center justify-center font-mono shadow-sm">#${rank}</span>
             <div>
               <h4 class="text-sm font-bold text-slate-900">${user.email}</h4>
-              <p class="text-[11px] text-slate-500 font-medium mt-0.5">Bought: <span class="text-blue-600 font-bold">${user.bought}</span> | OTP: <span class="text-emerald-600 font-bold">${user.otps}</span> | Canceled: <span class="text-rose-600 font-bold">${user.canceled}</span></p>
+              <p class="text-[11px] text-slate-500 font-medium mt-0.5">Bought: <span class="text-blue-600 font-bold">${user.bought}</span> | Success: <span class="text-emerald-600 font-bold">${user.otps}</span> | Canceled: <span class="text-rose-600 font-bold">${user.canceled}</span></p>
             </div>
           </div>
           <div class="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-0 pt-2 sm:pt-0 border-slate-200">
             <button onclick="openUserLifetimeModal('${user.email}')" class="bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1">
               <i class="fa-solid fa-eye"></i> View Report
             </button>
-            <span class="text-sm font-black text-amber-600 font-mono">৳${user.investment.toFixed(2)}</span>
+            <span class="text-sm font-black text-amber-600 font-mono">$${user.investment.toFixed(2)}</span>
           </div>
         `;
         otherUsersList.appendChild(row);
@@ -1112,6 +1158,7 @@ async function loadAllUserReportSheet() {
   }
 }
 
+// === OPEN LIFETIME MODAL (Total Spent = Bought * 0.12$) ===
 async function openUserLifetimeModal(targetEmail) {
   const modal = document.getElementById("userLifetimeModal");
   const modalEmail = document.getElementById("modalUserEmail");
@@ -1123,40 +1170,48 @@ async function openUserLifetimeModal(targetEmail) {
 
   tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">Loading user history...</td></tr>`;
 
-  const { data } = await _supabase
-    .from("orders")
+  const { data: caData } = await _supabase
+    .from("canada_orders")
     .select("*")
-    .eq("user_email", targetEmail)
-    .order("created_at", { ascending: false });
+    .eq("user_email", targetEmail);
 
-  if (data && data.length > 0) {
+  if (caData && caData.length > 0) {
     const grouped = {};
-    data.forEach((order) => {
+    caData.forEach((order) => {
       const dateStr = new Date(order.created_at).toISOString().split("T")[0];
       if (!grouped[dateStr])
         grouped[dateStr] = { bought: 0, otps: 0, canceled: 0 };
-      grouped[dateStr].bought += 1;
-      if (order.otp && order.otp !== "Waiting..." && order.otp !== "N/A")
-        grouped[dateStr].otps += 1;
-      if (order.status === "Canceled & Refunded" || order.status === "Canceled")
+
+      const status = (order.status || "").toLowerCase();
+      if (status.includes("cancel")) {
         grouped[dateStr].canceled += 1;
+      } else {
+        grouped[dateStr].bought += 1;
+        if (status.includes("success")) {
+          grouped[dateStr].otps += 1;
+        }
+      }
     });
 
     tbody.innerHTML = "";
-    Object.keys(grouped).forEach((date) => {
-      const info = grouped[date];
-      const inv = info.otps * 20;
-      const row = document.createElement("tr");
-      row.className = "hover:bg-slate-50 transition";
-      row.innerHTML = `
+    Object.keys(grouped)
+      .sort()
+      .reverse()
+      .forEach((date) => {
+        const info = grouped[date];
+        // 🟢 Lifetime মডালেও Numbers Bought * 0.12$ হিসাব করা হলো
+        const inv = info.bought * 0.12;
+        const row = document.createElement("tr");
+        row.className = "hover:bg-slate-50 transition";
+        row.innerHTML = `
         <td class="py-3 px-4 font-mono text-xs font-bold text-slate-800">${date}</td>
         <td class="py-3 px-4 text-blue-600 font-bold">${info.bought}</td>
         <td class="py-3 px-4 text-emerald-600 font-bold">${info.otps}</td>
         <td class="py-3 px-4 text-rose-600 font-bold">${info.canceled}</td>
-        <td class="py-3 px-4 text-amber-600 font-bold">৳${inv.toFixed(2)}</td>
+        <td class="py-3 px-4 text-amber-600 font-bold">$${inv.toFixed(2)}</td>
       `;
-      tbody.appendChild(row);
-    });
+        tbody.appendChild(row);
+      });
   } else {
     tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">No activity history found for this user.</td></tr>`;
   }
@@ -1185,3 +1240,627 @@ document.addEventListener("keydown", function (e) {
 document.addEventListener("contextmenu", function (e) {
   e.preventDefault();
 });
+
+let parsedBulkData = [];
+
+// === HANDLE EXCEL/CSV SHEET UPLOAD ===
+function handleSheetUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const fileNameEl = document.getElementById("selectedFileName");
+  if (fileNameEl) fileNameEl.innerText = file.name;
+
+  const reader = new FileReader();
+
+  reader.onload = function (e) {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: "array" });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+    parsedBulkData = [];
+    jsonData.forEach((row) => {
+      if (row && row.length >= 2) {
+        const num = String(row[0] || "").trim();
+        const link = String(row[1] || "").trim();
+        if (
+          num &&
+          link &&
+          !num.toLowerCase().includes("number") &&
+          !num.toLowerCase().includes("phone")
+        ) {
+          parsedBulkData.push({ phone_number: num, link: link });
+        }
+      }
+    });
+
+    // Reset text input when sheet is uploaded
+    const bulkInput = document.getElementById("bulkNumberInput");
+    if (bulkInput) bulkInput.value = "";
+
+    renderParsedPreview();
+  };
+
+  reader.readAsArrayBuffer(file);
+}
+
+// === HANDLE MANUAL BULK INPUT CHANGE (Supports Space, Tab & Comma) ===
+document
+  .getElementById("bulkNumberInput")
+  ?.addEventListener("input", function () {
+    const text = this.value.trim();
+    const sheetInput = document.getElementById("sheetFileInput");
+
+    if (!text) {
+      if (!sheetInput || !sheetInput.files || !sheetInput.files.length) {
+        parsedBulkData = [];
+        renderParsedPreview();
+      }
+      return;
+    }
+
+    const lines = text.split("\n");
+    parsedBulkData = [];
+
+    lines.forEach((line) => {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) return;
+
+      let parts = [];
+      if (trimmedLine.includes(",")) {
+        parts = trimmedLine.split(",");
+      } else {
+        parts = trimmedLine.split(/\s+/); // Splits by space, tab, or multiple whitespaces
+      }
+
+      if (parts.length >= 2) {
+        const num = parts[0].trim();
+        const link = parts.slice(1).join(" ").trim();
+        if (num && link) {
+          parsedBulkData.push({ phone_number: num, link: link });
+        }
+      }
+    });
+
+    renderParsedPreview();
+  });
+
+// === RENDER PREVIEW TABLE ===
+function renderParsedPreview() {
+  const previewSection = document.getElementById("parsedPreviewSection");
+  const tbody = document.getElementById("parsedPreviewTableBody");
+  const badge = document.getElementById("parsedCountBadge");
+
+  if (badge) badge.innerText = `Total Items: ${parsedBulkData.length}`;
+
+  if (parsedBulkData.length > 0) {
+    if (previewSection) previewSection.classList.remove("hidden");
+    if (tbody) {
+      tbody.innerHTML = "";
+      parsedBulkData.forEach((item, index) => {
+        const row = document.createElement("tr");
+        row.className = "hover:bg-slate-50 transition";
+        row.innerHTML = `
+          <td class="py-2 px-3 text-slate-400 font-mono">${index + 1}</td>
+          <td class="py-2 px-3 font-bold text-slate-800 font-mono">${item.phone_number}</td>
+          <td class="py-2 px-3 text-blue-600 truncate max-w-xs font-mono">${item.link}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+  } else {
+    if (previewSection) previewSection.classList.add("hidden");
+  }
+}
+
+// === SAVE BULK NUMBERS TO SUPABASE DATABASE ===
+async function submitBulkWhatsAppNumbers() {
+  if (parsedBulkData.length === 0) {
+    showToast(
+      "Please upload an Excel sheet or paste valid numbers & links!",
+      true,
+    );
+    return;
+  }
+
+  if (!_supabase) return;
+
+  showToast(`Uploading ${parsedBulkData.length} entries to database...`);
+
+  // Map entries for Supabase table
+  const insertPayload = parsedBulkData.map((item) => ({
+    phone_number: item.phone_number,
+    link: item.link,
+    created_at: new Date().toISOString(),
+  }));
+
+  const { data, error } = await _supabase
+    .from("whatsapp_numbers")
+    .insert(insertPayload);
+
+  if (!error) {
+    showToast(`Successfully saved ${parsedBulkData.length} WhatsApp numbers!`);
+    parsedBulkData = [];
+
+    const bulkInput = document.getElementById("bulkNumberInput");
+    const sheetInput = document.getElementById("sheetFileInput");
+    const fileNameEl = document.getElementById("selectedFileName");
+
+    if (bulkInput) bulkInput.value = "";
+    if (sheetInput) sheetInput.value = "";
+    if (fileNameEl) fileNameEl.innerText = "No file chosen";
+
+    renderParsedPreview();
+  } else {
+    showToast("Error saving numbers: " + error.message, true);
+  }
+}
+
+// === ১. BUY CANADA NUMBER (Added System Log for Live Feed) ===
+async function buyCanadaNumber() {
+  if (!_supabase || !loggedInUser) return;
+
+  const btnTrigger = document.getElementById("btnTriggerBuyCanada");
+  if (btnTrigger) {
+    btnTrigger.disabled = true;
+    btnTrigger.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Securing Number...`;
+  }
+
+  try {
+    const { data: profile } = await _supabase
+      .from("user_profiles")
+      .select("daily_limit")
+      .eq("email", loggedInUser.email)
+      .single();
+
+    let currentLimit = profile ? profile.daily_limit : 0;
+    if (currentLimit <= 0) {
+      showToast("Daily limit reached! You cannot buy more numbers.", true);
+      return;
+    }
+
+    const { data: availableStock, error: fetchErr } = await _supabase
+      .from("whatsapp_numbers")
+      .select("*")
+      .is("assigned_to", null);
+
+    if (fetchErr || !availableStock || availableStock.length === 0) {
+      showToast("No Canada numbers available in stock right now!", true);
+      return;
+    }
+
+    const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
+    const currentUserEmail = loggedInUser.email.trim().toLowerCase();
+
+    let userFilteredStock = availableStock.filter((item) => {
+      if (!item.last_assigned_to || !item.last_assigned_at) return true;
+      const isSameUser =
+        item.last_assigned_to.trim().toLowerCase() === currentUserEmail;
+      if (!isSameUser) return true;
+      const lastTime = new Date(item.last_assigned_at).getTime();
+      return lastTime < thirtyMinutesAgo;
+    });
+
+    if (userFilteredStock.length === 0) {
+      showToast(
+        "Cooldown active! You must wait 30 minutes before taking this number again.",
+        true,
+      );
+      return;
+    }
+
+    let assignedStock = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (userFilteredStock.length === 0) break;
+      const randomIndex = Math.floor(Math.random() * userFilteredStock.length);
+      const randomStockNum = userFilteredStock[randomIndex];
+      const dhakaTime = new Date().toISOString();
+
+      const { data: updatedData, error: updateErr } = await _supabase
+        .from("whatsapp_numbers")
+        .update({
+          assigned_to: loggedInUser.email,
+          last_assigned_to: loggedInUser.email,
+          last_assigned_at: dhakaTime,
+        })
+        .eq("id", randomStockNum.id)
+        .is("assigned_to", null)
+        .select();
+
+      if (!updateErr && updatedData && updatedData.length > 0) {
+        assignedStock = randomStockNum;
+        break;
+      } else {
+        userFilteredStock.splice(randomIndex, 1);
+      }
+    }
+
+    if (!assignedStock) {
+      showToast("Could not secure a unique number. Please try again!", true);
+      return;
+    }
+
+    const cadOrderId = "CAD-" + Math.floor(100000 + Math.random() * 900000);
+    const phoneNumberStr = assignedStock.phone_number;
+    const stockLinkStr = assignedStock.link || "https://sms.elitetrick.com/";
+    const dhakaTimeIns = new Date().toISOString();
+
+    // Insert into canada_orders
+    await _supabase.from("canada_orders").insert([
+      {
+        order_id: String(cadOrderId),
+        phone_number: phoneNumberStr,
+        otp: stockLinkStr,
+        status: "Confirmed",
+        user_email: loggedInUser.email,
+        created_at: dhakaTimeIns,
+      },
+    ]);
+
+    // 🟢 লাইভ ফিডে দেখানোর জন্য system_logs এ রেকর্ড করা হলো
+    await recordSystemLog(
+      loggedInUser.email,
+      "CANADA_NEW_ORDER",
+      String(cadOrderId),
+      phoneNumberStr,
+    );
+
+    let newLimit = currentLimit - 1;
+    if (newLimit < 0) newLimit = 0;
+
+    await _supabase
+      .from("user_profiles")
+      .update({ daily_limit: newLimit })
+      .eq("email", loggedInUser.email);
+
+    currentUserDailyLimit = newLimit;
+    if (typeof updateUserLimitSidebar === "function") updateUserLimitSidebar();
+
+    document.getElementById("canadaOrderTitle").innerText =
+      `Canada Order #${cadOrderId}`;
+    document.getElementById("canadaActivationId").innerText = cadOrderId;
+    document.getElementById("canadaPhoneNumber").innerText = phoneNumberStr;
+    document.getElementById("canadaOtpCode").innerText = stockLinkStr;
+    document.getElementById("canadaOrderStatusText").innerText =
+      "Confirmed (Stock)";
+
+    const cancelBtn = document.getElementById("canadaBtnCancelOrder");
+    const successBtn = document.getElementById("canadaBtnSuccessOrder");
+
+    if (cancelBtn) {
+      cancelBtn.disabled = false;
+      cancelBtn.setAttribute(
+        "onclick",
+        `cancelCanadaActiveOrder('${cadOrderId}')`,
+      );
+      cancelBtn.classList.remove("opacity-50", "cursor-not-allowed");
+    }
+    if (successBtn) {
+      successBtn.disabled = false;
+      successBtn.setAttribute(
+        "onclick",
+        `completeCanadaActiveOrder('${cadOrderId}')`,
+      );
+      successBtn.classList.remove("opacity-50", "cursor-not-allowed");
+    }
+
+    document.getElementById("canadaBuySection").classList.add("hidden");
+    document.getElementById("canadaOrderCard").classList.remove("hidden");
+
+    const canadaHistorySection = document.getElementById(
+      "canadaHistorySection",
+    );
+    if (canadaHistorySection) canadaHistorySection.classList.add("hidden");
+
+    showToast("Canada Number secured successfully!");
+    if (typeof fetchDashboardStats === "function") fetchDashboardStats();
+  } catch (e) {
+    console.error("Canada buy error:", e);
+    showToast("Error acquiring Canada number: " + e.message, true);
+  } finally {
+    if (btnTrigger) {
+      btnTrigger.disabled = false;
+      btnTrigger.innerHTML = `<i class="fa-solid fa-cart-shopping text-sm"></i> Buy Canada Number`;
+    }
+  }
+}
+
+// === ২. CANCEL CANADA ORDER (Added System Log) ===
+async function cancelCanadaActiveOrder(specificId) {
+  const orderId =
+    specificId || document.getElementById("canadaActivationId").innerText;
+  if (!orderId || orderId === "-") return;
+
+  if (
+    !confirm(
+      "Are you sure you want to cancel this Canada order? The number will return to stock and your limit will be restored.",
+    )
+  )
+    return;
+
+  showToast("Canceling Canada order & returning stock...");
+
+  try {
+    const cleanId = String(orderId).replace("#", "").trim();
+
+    const { data: orderData } = await _supabase
+      .from("canada_orders")
+      .select("phone_number")
+      .eq("order_id", cleanId)
+      .maybeSingle();
+
+    if (orderData && orderData.phone_number) {
+      await _supabase
+        .from("whatsapp_numbers")
+        .update({ assigned_to: null })
+        .eq("phone_number", orderData.phone_number);
+    }
+
+    await _supabase
+      .from("canada_orders")
+      .update({ status: "Canceled & Refunded" })
+      .eq("order_id", cleanId);
+
+    // 🟢 লাইভ ফিডের জন্য লগ করা
+    await recordSystemLog(
+      loggedInUser.email,
+      "CANADA_CANCELED",
+      cleanId,
+      orderData ? orderData.phone_number : "",
+    );
+
+    const { data: profile } = await _supabase
+      .from("user_profiles")
+      .select("daily_limit")
+      .eq("email", loggedInUser.email)
+      .single();
+
+    let restoredLimit = (profile ? profile.daily_limit : 0) + 1;
+    await _supabase
+      .from("user_profiles")
+      .update({ daily_limit: restoredLimit })
+      .eq("email", loggedInUser.email);
+
+    currentUserDailyLimit = restoredLimit;
+    if (typeof updateUserLimitSidebar === "function") updateUserLimitSidebar();
+
+    showToast("Canada order canceled & refunded successfully!");
+    if (typeof fetchDashboardStats === "function") fetchDashboardStats();
+
+    setTimeout(() => {
+      if (typeof resetCanadaBuyView === "function") resetCanadaBuyView();
+    }, 1500);
+  } catch (e) {
+    console.error("Cancel Canada error:", e);
+    showToast("Error canceling Canada order: " + e.message, true);
+  }
+}
+// === MARK CANADA ORDER AS SUCCESS ===
+async function completeCanadaActiveOrder(specificId) {
+  const orderId =
+    specificId || document.getElementById("canadaActivationId").innerText;
+  if (!orderId || orderId === "-") return;
+
+  if (
+    !confirm(
+      "Are you sure you want to mark this Canada order/account as Success?",
+    )
+  )
+    return;
+
+  showToast("Updating order status to Success...");
+
+  try {
+    const cleanId = String(orderId).replace("#", "").trim();
+
+    // 1. Update status in 'canada_orders' table to Success
+    await _supabase
+      .from("canada_orders")
+      .update({ status: "Success" })
+      .eq("order_id", cleanId);
+
+    // 2. Update UI Status text
+    const statusEl = document.getElementById("canadaOrderStatusText");
+    if (statusEl) {
+      statusEl.innerText = "Success (Completed)";
+      statusEl.className = "text-emerald-600 font-bold text-base mt-1";
+    }
+
+    // 3. Disable both buttons so they cannot be clicked again
+    const cancelBtn = document.getElementById("canadaBtnCancelOrder");
+    const successBtn = document.getElementById("canadaBtnSuccessOrder");
+
+    if (cancelBtn) {
+      cancelBtn.disabled = true;
+      cancelBtn.classList.add(
+        "opacity-50",
+        "cursor-not-allowed",
+        "bg-gray-100",
+      );
+      cancelBtn.classList.remove("hover:bg-rose-100", "cursor-pointer");
+    }
+
+    if (successBtn) {
+      successBtn.disabled = true;
+      successBtn.classList.add(
+        "opacity-50",
+        "cursor-not-allowed",
+        "bg-emerald-400",
+      );
+      successBtn.classList.remove("hover:bg-emerald-700", "cursor-pointer");
+    }
+
+    showToast("Canada order marked as Success successfully!");
+
+    // ১.৫ সেকেন্ড পর অটো রিসেট হয়ে বাই স্ক্রিন ও হিস্ট্রি টেবিলে ফিরে যাবে
+    setTimeout(() => {
+      if (typeof resetCanadaBuyView === "function") {
+        resetCanadaBuyView();
+      }
+    }, 1500);
+  } catch (e) {
+    console.error("Success Canada error:", e);
+    showToast("Error updating Canada order: " + e.message, true);
+  }
+}
+// === FETCH CANADA HISTORY (Newest/Latest order always at the top based on Serial/ID) ===
+async function fetchCanadaHistory() {
+  if (!_supabase || !loggedInUser) return;
+
+  try {
+    // 🟢 আইডি (id) অথবা সিরিয়াল অনুযায়ী ডিসেন্ডিং অর্ডারে ফেচ করা, যাতে নতুন অর্ডার সবার উপরে থাকে
+    const { data, error } = await _supabase
+      .from("canada_orders")
+      .select("*")
+      .eq("user_email", loggedInUser.email)
+      .order("id", { ascending: false }); // অথবা .order("created_at", { ascending: false })
+
+    if (error) throw error;
+
+    const tbody = document.getElementById("canadaHistoryTableBody");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+
+    if (!data || data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400 font-normal">No Canada history found.</td></tr>`;
+      return;
+    }
+
+    data.forEach((order) => {
+      let statusBadge = "";
+      if (order.status && order.status.toLowerCase().includes("cancel")) {
+        statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-100 whitespace-nowrap">
+                        <i class="fa-solid fa-circle-xmark mr-1"></i> Canceled & Refunded
+                      </span>`;
+      } else if (
+        order.status &&
+        order.status.toLowerCase().includes("success")
+      ) {
+        statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100 whitespace-nowrap">
+                        <i class="fa-solid fa-circle-check mr-1"></i> Success (Completed)
+                      </span>`;
+      } else {
+        statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100 whitespace-nowrap">
+                        <i class="fa-solid fa-circle-check mr-1"></i> ${order.status}
+                      </span>`;
+      }
+
+      const row = `
+        <tr class="border-b border-slate-50 hover:bg-slate-50/80 transition-colors">
+          <td class="py-3.5 px-4 text-blue-600 font-bold">#${order.order_id}</td>
+          <td class="py-3.5 px-4 text-slate-700 font-semibold">${order.phone_number || "-"}</td>
+          <td class="py-3.5 px-4 max-w-[200px] truncate">
+            <a href="${order.otp}" target="_blank" class="text-blue-500 hover:text-blue-700 hover:underline text-xs bg-blue-50 px-2 py-1 rounded border border-blue-100 inline-block truncate max-w-full">
+              ${order.otp || "-"}
+            </a>
+          </td>
+          <td class="py-3.5 px-4">${statusBadge}</td>
+          <td class="py-3.5 px-4 text-center">
+            <button onclick="viewCanadaOrder('${order.order_id}')" class="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm inline-flex items-center gap-1">
+              <i class="fa-solid fa-eye"></i> View
+            </button>
+          </td>
+        </tr>
+      `;
+      tbody.innerHTML += row;
+    });
+  } catch (e) {
+    console.error("Error fetching Canada history:", e);
+  }
+}
+
+// === VIEW CANADA ORDER FROM HISTORY ===
+async function viewCanadaOrder(orderId) {
+  if (!_supabase) return;
+
+  try {
+    const cleanId = String(orderId).replace("#", "").trim();
+    const { data: order, error } = await _supabase
+      .from("canada_orders")
+      .select("*")
+      .eq("order_id", cleanId)
+      .single();
+
+    if (error || !order) {
+      showToast("Order details not found!", true);
+      return;
+    }
+
+    document.getElementById("canadaOrderTitle").innerText =
+      `Canada Order #${order.order_id}`;
+    document.getElementById("canadaActivationId").innerText = order.order_id;
+    document.getElementById("canadaPhoneNumber").innerText =
+      order.phone_number || "-";
+    document.getElementById("canadaOtpCode").innerText = order.otp || "-";
+
+    // 🟢 এই সেই কোডটি, যা আপনি ওপরের অংশে দিয়েছেন:
+    const statusEl = document.getElementById("canadaOrderStatusText");
+    const cancelBtn = document.getElementById("canadaBtnCancelOrder");
+    const successBtn = document.getElementById("canadaBtnSuccessOrder");
+
+    statusEl.innerText = order.status;
+
+    if (
+      order.status &&
+      (order.status.toLowerCase().includes("cancel") ||
+        order.status.toLowerCase().includes("success"))
+    ) {
+      statusEl.className = order.status.toLowerCase().includes("success")
+        ? "text-emerald-600 font-bold text-base mt-1"
+        : "text-rose-600 font-bold text-base mt-1";
+
+      // দুটি বাটনই ডিজেবল হয়ে যাবে যদি অলরেডি প্রসেসড হয়ে থাকে
+      if (cancelBtn) {
+        cancelBtn.disabled = true;
+        cancelBtn.classList.add("opacity-50", "cursor-not-allowed");
+      }
+      if (successBtn) {
+        successBtn.disabled = true;
+        successBtn.classList.add("opacity-50", "cursor-not-allowed");
+      }
+    } else {
+      statusEl.className = "text-emerald-600 font-bold text-base mt-1";
+      if (cancelBtn) {
+        cancelBtn.disabled = false;
+        cancelBtn.setAttribute(
+          "onclick",
+          `cancelCanadaActiveOrder('${order.order_id}')`,
+        );
+        cancelBtn.classList.remove("opacity-50", "cursor-not-allowed");
+      }
+      if (successBtn) {
+        successBtn.disabled = false;
+        successBtn.setAttribute(
+          "onclick",
+          `completeCanadaActiveOrder('${order.order_id}')`,
+        );
+        successBtn.classList.remove("opacity-50", "cursor-not-allowed");
+      }
+    }
+    // ----------------------------------------------------
+
+    document.getElementById("canadaBuySection").classList.add("hidden");
+    document.getElementById("canadaOrderCard").classList.remove("hidden");
+
+    const canadaHistorySection = document.getElementById(
+      "canadaHistorySection",
+    );
+    if (canadaHistorySection) canadaHistorySection.classList.add("hidden");
+  } catch (e) {
+    console.error("View order error:", e);
+  }
+}
+
+// === 3. RESET CANADA BUY VIEW (Restores history section when clicking New Order) ===
+function resetCanadaBuyView() {
+  document.getElementById("canadaOrderCard").classList.add("hidden");
+  document.getElementById("canadaBuySection").classList.remove("hidden");
+
+  // 🟢 রিসেট বা New Order-এ ক্লিক করলে হিস্ট্রি সেকশন আবার শো করবে
+  const canadaHistorySection = document.getElementById("canadaHistorySection");
+  if (canadaHistorySection) canadaHistorySection.classList.remove("hidden");
+  if (typeof fetchCanadaHistory === "function") fetchCanadaHistory();
+}
