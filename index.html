@@ -264,23 +264,21 @@
             >
           </a>
           <!-- Canada Stock Service Sidebar Nav Item -->
+          <!-- সাইডবারের ক্যানাডা স্টক মেনু -->
           <a
-            href="#"
+            onclick="switchTab('canada')"
             id="navCanada"
-            onclick="
-              switchTab('canada');
-              toggleMobileSidebarOnSelect();
-            "
-            class="flex items-center gap-3.5 px-4 py-3.5 rounded-2xl hover:bg-slate-800/60 text-slate-300 hover:text-white transition-all w-full text-left"
+            class="flex items-center gap-3.5 px-4 py-3.5 rounded-2xl hover:bg-slate-800/60 text-slate-300 hover:text-white transition-all w-full text-left cursor-pointer"
           >
-            <i
-              class="fa-solid fa-globe w-5 text-center text-blue-400 text-lg"
-            ></i>
-            <span class="flex-1">Canada Stock</span>
+            <i class="fa-solid fa-earth-americas text-blue-400"></i>
+            <span class="font-semibold text-sm flex-1">Canada Stock</span>
+            <!-- 🟢 ডাইনামিক কাউন্ট ব্যাজ -->
             <span
-              class="bg-blue-500/15 text-blue-400 text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wide"
-              >Stock</span
+              id="canadaStockBadge"
+              class="bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-md text-[11px] font-black animate-pulse"
             >
+              ...
+            </span>
           </a>
           <a
             href="#"

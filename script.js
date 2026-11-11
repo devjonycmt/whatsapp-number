@@ -1864,3 +1864,33 @@ function resetCanadaBuyView() {
   if (canadaHistorySection) canadaHistorySection.classList.remove("hidden");
   if (typeof fetchCanadaHistory === "function") fetchCanadaHistory();
 }
+
+
+// === FETCH AVAILABLE CANADA STOCK COUNT FOR SIDEBAR ===
+async function updateCanadaStockBadge() {
+  if (!_supabase) return;
+
+  try {
+    // whatsapp_numbers টেবিল থেকে যেগুলোর assigned_to ফাঁকা (null), তাদের কাউন্ট নেওয়া
+    const { count, error } = await _supabase
+      .from("whatsapp_numbers")
+      .select("*", { count: "exact", head: true })
+      .is("assigned_to", null);
+
+    if (error) throw error;
+
+    const badgeEl = document.getElementById("canadaStockBadge");
+    if (badgeEl) {
+      badgeEl.innerText = `${count !== null ? count : 0} Stock`;
+    }
+  } catch (e) {
+    console.error("Error fetching stock count:", e);
+  }
+}
+
+// 🟢 পেজ লোড হওয়ার পর এবং ড্যাশবোর্ড সুইচ করার সময় স্টক কাউন্ট রিয়েল-টাইম আপডেট হবে
+window.addEventListener("DOMContentLoaded", () => {
+  updateCanadaStockBadge();
+  // প্রতি ৩০ সেকেন্ড পর পর অটো স্টক কাউন্ট রিফ্রেশ হবে
+  setInterval(updateCanadaStockBadge, 30000);
+});
