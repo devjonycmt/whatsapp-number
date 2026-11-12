@@ -498,32 +498,70 @@ function switchTab(tab) {
   }
 }
 
-// === USER SPECIFIC DASHBOARD STATS ===
+// === USER SPECIFIC DASHBOARD STATS (Live Updated for Canada & WhatsApp) ===
 async function fetchDashboardStats() {
   if (!_supabase || !loggedInUser) return;
   const todayStr = new Date().toISOString().split("T")[0];
 
-  const { data } = await _supabase
+  // 1. WhatsApp Stats Fetch
+  const { data: waData } = await _supabase
     .from("orders")
     .select("*")
     .eq("user_email", loggedInUser.email)
     .gte("created_at", todayStr);
 
-  if (data) {
-    let boughtCount = data.length;
-    let otpCount = data.filter(
+  if (waData) {
+    let boughtCount = waData.length;
+    let otpCount = waData.filter(
       (o) => o.otp && o.otp !== "Waiting..." && o.otp !== "N/A",
     ).length;
-    let canceledCount = data.filter(
+    let canceledCount = waData.filter(
       (o) => o.status === "Canceled & Refunded" || o.status === "Canceled",
     ).length;
     let totalSpent = otpCount * 20;
+
+    const statBought = document.getElementById("statBought");
+    const statOtp = document.getElementById("statOtp");
+    const statCanceled = document.getElementById("statCanceled");
+    const statInvestment = document.getElementById("statInvestment");
 
     if (statBought) statBought.innerText = boughtCount;
     if (statOtp) statOtp.innerText = otpCount;
     if (statCanceled) statCanceled.innerText = canceledCount;
     if (statInvestment) statInvestment.innerText = `৳${totalSpent.toFixed(2)}`;
+  }
 
+  // 2. 🇨🇦 Canada Stock Stats Fetch (Fixed & Real-time Live)
+  const { data: caData } = await _supabase
+    .from("canada_orders")
+    .select("*")
+    .eq("user_email", loggedInUser.email)
+    .gte("created_at", todayStr);
+
+  if (caData) {
+    // Numbers Bought = মোট যতগুলো অর্ডার হয়েছে (যেগুলো ক্যানসেল হয়নি)
+    let caBought = caData.filter(
+      (o) => !o.status || !o.status.toLowerCase().includes("cancel"),
+    ).length;
+
+    // Canceled Orders = যেগুলোর স্ট্যাটাসে cancel রয়েছে
+    let caCanceled = caData.filter(
+      (o) => o.status && o.status.toLowerCase().includes("cancel"),
+    ).length;
+
+    // Total Spent = Numbers Bought * 0.12$
+    let caSpent = caBought * 0.12;
+
+    const statCanadaBought = document.getElementById("statCanadaBought");
+    const statCanadaCanceled = document.getElementById("statCanadaCanceled");
+    const statCanadaSpent = document.getElementById("statCanadaSpent");
+
+    if (statCanadaBought) statCanadaBought.innerText = caBought;
+    if (statCanadaCanceled) statCanadaCanceled.innerText = caCanceled;
+    if (statCanadaSpent) statCanadaSpent.innerText = `$${caSpent.toFixed(2)}`;
+  }
+
+  if (typeof updateUserLimitSidebar === "function") {
     updateUserLimitSidebar();
   }
 }
@@ -2019,3 +2057,77 @@ async function publishSystemUpdate() {
     showToast("Failed to push update: " + error.message, true);
   }
 }
+
+// === EVENT-DRIVEN REALTIME LISTENER (Updates ONLY when new data arrives) ===
+function initEventDrivenRealtime() {
+  if (!_supabase || !loggedInUser) return;
+
+  // ১. নতুন অর্ডার বা ক্যানসেল হলে ড্যাশবোর্ড স্ট্যাটস আপডেট (Canada & WhatsApp)
+  _supabase
+    .channel("realtime-dashboard-stats")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "canada_orders" },
+      (payload) => {
+        if (typeof fetchDashboardStats === "function") fetchDashboardStats();
+      },
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "orders" },
+      (payload) => {
+        if (typeof fetchDashboardStats === "function") fetchDashboardStats();
+      },
+    )
+    .subscribe();
+
+  // ২. স্টক নাম্বার যুক্ত বা অ্যাসাইন হলে সাইডবারের Canada Stock ব্যাজ আপডেট
+  _supabase
+    .channel("realtime-stock-count")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "whatsapp_numbers" },
+      (payload) => {
+        if (typeof updateCanadaStockBadge === "function")
+          updateCanadaStockBadge();
+      },
+    )
+    .subscribe();
+
+  // ৩. নতুন অ্যাক্টিভিটি লগ ইনসার্ট হলেই কেবল Live Activity Feed আপডেট
+  _supabase
+    .channel("realtime-activity-feed")
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "system_logs" },
+      (payload) => {
+        if (typeof fetchGlobalActivityLog === "function")
+          fetchGlobalActivityLog();
+      },
+    )
+    .subscribe();
+
+  // ৪. অ্যাডমিন নতুন ভার্সন পুশ করলেই কেবল Refresh Modal শো করবে
+  _supabase
+    .channel("realtime-app-update")
+    .on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "app_settings" },
+      (payload) => {
+        if (typeof checkAppUpdateVersion === "function")
+          checkAppUpdateVersion();
+      },
+    )
+    .subscribe();
+}
+
+// পেজ লোড হলে একবার প্রাথমিক ডাটা লোড হবে এবং রিয়েল-টাইম লিসেনার চালু হয়ে যাবে
+window.addEventListener("DOMContentLoaded", () => {
+  if (typeof fetchDashboardStats === "function") fetchDashboardStats();
+  if (typeof updateCanadaStockBadge === "function") updateCanadaStockBadge();
+  if (typeof fetchGlobalActivityLog === "function") fetchGlobalActivityLog();
+  if (typeof checkAppUpdateVersion === "function") checkAppUpdateVersion();
+
+  // 🟢 রিয়েল-টাইম ইভেন্ট লিসেনার অ্যাক্টিভ করা হলো
+  initEventDrivenRealtime();
+});
