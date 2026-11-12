@@ -494,6 +494,7 @@ function switchTab(tab) {
     if (navAdminUsers)
       navAdminUsers.className = activeNav + " border border-amber-500/20";
     loadAllUsersAdmin();
+    loadAdminUpdateSettings();
   }
 }
 
@@ -1912,3 +1913,109 @@ window.addEventListener("DOMContentLoaded", () => {
   // প্রতি ৩০ সেকেন্ড পর পর অটো স্টক কাউন্ট রিফ্রেশ হবে
   setInterval(updateCanadaStockBadge, 30000);
 });
+
+// === SYSTEM UPDATE CHECKER & LIVE MODAL ===
+let currentAppVersion = null;
+
+async function checkAppUpdateVersion() {
+  if (!_supabase) return;
+
+  try {
+    const { data, error } = await _supabase
+      .from("app_settings")
+      .select("version, update_message")
+      .eq("id", 1)
+      .single();
+
+    if (error || !data) return;
+
+    // প্রথমবার পেজ লোড হলে বর্তমান ভার্সনটি মেমোরিতে সেভ রাখা
+    if (currentAppVersion === null) {
+      currentAppVersion = data.version;
+    }
+    // যদি ডাটাবেজের ভার্সন পরিবর্তন হয়, তবে সাথে সাথে মডাল শো করবে
+    else if (currentAppVersion !== data.version) {
+      const modal = document.getElementById("systemUpdateModal");
+      const msgEl = document.getElementById("systemUpdateMsg");
+
+      if (msgEl && data.update_message) {
+        msgEl.innerText = data.update_message;
+      }
+      if (modal) {
+        modal.classList.remove("hidden");
+      }
+    }
+  } catch (e) {
+    console.error("Update check error:", e);
+  }
+}
+
+// হার্ড রিফ্রেশ ফাংশন (যাতে ব্রাউজার ক্যাশ ক্লিয়ার হয়ে নতুন ফাইল লোড হয়)
+function forceHardRefresh() {
+  window.location.reload(true);
+}
+
+// পেজ লোড হলে ভার্সন চেক শুরু হবে এবং প্রতি ১০ সেকেন্ড পরপর চেক করবে
+window.addEventListener("DOMContentLoaded", () => {
+  checkAppUpdateVersion();
+  setInterval(checkAppUpdateVersion, 10000);
+});
+
+// === LOAD CURRENT VERSION IN ADMIN PANEL ===
+async function loadAdminUpdateSettings() {
+  if (!_supabase || !loggedInUser || loggedInUser.role !== "admin") return;
+
+  const { data } = await _supabase
+    .from("app_settings")
+    .select("*")
+    .eq("id", 1)
+    .single();
+
+  if (data) {
+    const badge = document.getElementById("adminCurrentVersionBadge");
+    const verInput = document.getElementById("adminNewVersionInput");
+    const msgInput = document.getElementById("adminUpdateMsgInput");
+
+    if (badge) badge.innerText = data.version;
+    if (verInput) verInput.value = data.version;
+    if (msgInput) msgInput.value = data.update_message;
+  }
+}
+
+// === PUBLISH SYSTEM UPDATE (ADMIN ONLY) ===
+async function publishSystemUpdate() {
+  if (!loggedInUser || loggedInUser.role !== "admin") {
+    showToast("Access Denied! Admin only.", true);
+    return;
+  }
+
+  const newVer = document.getElementById("adminNewVersionInput")?.value.trim();
+  const newMsg = document.getElementById("adminUpdateMsgInput")?.value.trim();
+
+  if (!newVer || !newMsg) {
+    showToast("Please enter both Version and Update Message!", true);
+    return;
+  }
+
+  const { error } = await _supabase
+    .from("app_settings")
+    .update({
+      version: newVer,
+      update_message: newMsg,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", 1);
+
+  if (!error) {
+    // অ্যাডমিনের নিজের স্ক্রিনে যাতে অযথা মডাল পপ-আপ না আসে, তাই লোকাল ভার্সন আপডেট করে রাখা হলো
+    currentAppVersion = newVer;
+    const badge = document.getElementById("adminCurrentVersionBadge");
+    if (badge) badge.innerText = newVer;
+
+    showToast(
+      `Update v${newVer} pushed! All active users will see the refresh popup.`,
+    );
+  } else {
+    showToast("Failed to push update: " + error.message, true);
+  }
+}
