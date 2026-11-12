@@ -1398,7 +1398,7 @@ async function submitBulkWhatsAppNumbers() {
   }
 }
 
-// === ১. BUY CANADA NUMBER (Added System Log for Live Feed) ===
+// === ১. BUY CANADA NUMBER (Per-User 10-Hour Cooldown Check) ===
 async function buyCanadaNumber() {
   if (!_supabase || !loggedInUser) return;
 
@@ -1421,6 +1421,19 @@ async function buyCanadaNumber() {
       return;
     }
 
+    // ১. এই ইউজারের বর্তমানে কোন কোন নাম্বারের ওপর ১০ ঘণ্টার কুলডাউন একটিভ আছে তা ফেচ করা
+    const nowIso = new Date().toISOString();
+    const { data: activeCooldowns } = await _supabase
+      .from("number_cooldowns")
+      .select("phone_number")
+      .eq("user_email", loggedInUser.email)
+      .gt("cooldown_until", nowIso);
+
+    const restrictedPhones = activeCooldowns
+      ? activeCooldowns.map((c) => c.phone_number)
+      : [];
+
+    // ২. সব আনঅ্যাসাইনড স্টক ফেচ করা
     const { data: availableStock, error: fetchErr } = await _supabase
       .from("whatsapp_numbers")
       .select("*")
@@ -1431,21 +1444,14 @@ async function buyCanadaNumber() {
       return;
     }
 
-    const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
-    const currentUserEmail = loggedInUser.email.trim().toLowerCase();
-
-    let userFilteredStock = availableStock.filter((item) => {
-      if (!item.last_assigned_to || !item.last_assigned_at) return true;
-      const isSameUser =
-        item.last_assigned_to.trim().toLowerCase() === currentUserEmail;
-      if (!isSameUser) return true;
-      const lastTime = new Date(item.last_assigned_at).getTime();
-      return lastTime < thirtyMinutesAgo;
-    });
+    // ৩. ইউজারের নিজস্ব রেস্ট্রিক্টেড নাম্বারগুলো স্টক থেকে বাদ দেওয়া (অন্য কেউ নিক বা না নিক, এই ইউজারের জন্য ব্লক থাকবে)
+    let userFilteredStock = availableStock.filter(
+      (item) => !restrictedPhones.includes(item.phone_number),
+    );
 
     if (userFilteredStock.length === 0) {
       showToast(
-        "Cooldown active! You must wait 30 minutes before taking this number again.",
+        "Cooldown active! You have a 10-hour restriction on your recently canceled numbers.",
         true,
       );
       return;
@@ -1454,6 +1460,7 @@ async function buyCanadaNumber() {
     let assignedStock = null;
     for (let attempt = 0; attempt < 3; attempt++) {
       if (userFilteredStock.length === 0) break;
+
       const randomIndex = Math.floor(Math.random() * userFilteredStock.length);
       const randomStockNum = userFilteredStock[randomIndex];
       const dhakaTime = new Date().toISOString();
@@ -1487,7 +1494,6 @@ async function buyCanadaNumber() {
     const stockLinkStr = assignedStock.link || "https://sms.elitetrick.com/";
     const dhakaTimeIns = new Date().toISOString();
 
-    // Insert into canada_orders
     await _supabase.from("canada_orders").insert([
       {
         order_id: String(cadOrderId),
@@ -1499,7 +1505,6 @@ async function buyCanadaNumber() {
       },
     ]);
 
-    // 🟢 লাইভ ফিডে দেখানোর জন্য system_logs এ রেকর্ড করা হলো
     await recordSystemLog(
       loggedInUser.email,
       "CANADA_NEW_ORDER",
@@ -1567,7 +1572,7 @@ async function buyCanadaNumber() {
   }
 }
 
-// === ২. CANCEL CANADA ORDER (Added System Log) ===
+// === ২. CANCEL CANADA ORDER (Adds 10-Hour Cooldown Record for this User) ===
 async function cancelCanadaActiveOrder(specificId) {
   const orderId =
     specificId || document.getElementById("canadaActivationId").innerText;
@@ -1592,10 +1597,25 @@ async function cancelCanadaActiveOrder(specificId) {
       .maybeSingle();
 
     if (orderData && orderData.phone_number) {
+      const phoneNum = orderData.phone_number;
+
+      // স্টক ফ্রী করা হলো
       await _supabase
         .from("whatsapp_numbers")
         .update({ assigned_to: null })
-        .eq("phone_number", orderData.phone_number);
+        .eq("phone_number", phoneNum);
+
+      // 🟢 এই ইউজারের জন্য সুনির্দিষ্টভাবে ১০ ঘণ্টার কুলডাউন রেকর্ড এন্ট্রি করা হলো
+      const cooldownUntilTime = new Date(
+        Date.now() + 10 * 60 * 60 * 1000,
+      ).toISOString();
+      await _supabase.from("number_cooldowns").insert([
+        {
+          user_email: loggedInUser.email,
+          phone_number: phoneNum,
+          cooldown_until: cooldownUntilTime,
+        },
+      ]);
     }
 
     await _supabase
@@ -1603,7 +1623,6 @@ async function cancelCanadaActiveOrder(specificId) {
       .update({ status: "Canceled & Refunded" })
       .eq("order_id", cleanId);
 
-    // 🟢 লাইভ ফিডের জন্য লগ করা
     await recordSystemLog(
       loggedInUser.email,
       "CANADA_CANCELED",
@@ -1864,7 +1883,6 @@ function resetCanadaBuyView() {
   if (canadaHistorySection) canadaHistorySection.classList.remove("hidden");
   if (typeof fetchCanadaHistory === "function") fetchCanadaHistory();
 }
-
 
 // === FETCH AVAILABLE CANADA STOCK COUNT FOR SIDEBAR ===
 async function updateCanadaStockBadge() {
