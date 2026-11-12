@@ -1080,7 +1080,7 @@ async function fetchGlobalActivityLog() {
     container.innerHTML = `<div class="text-slate-500 italic py-2">No platform activity recorded yet.</div>`;
   }
 }
-// === LOAD ALL USERS REPORT SHEET (Total Spent = Numbers Bought * 0.12$) ===
+// === LOAD ALL USERS REPORT SHEET (Bought & Success Same Count) ===
 async function loadAllUserReportSheet() {
   if (!_supabase) return;
   const todayStr = new Date().toISOString().split("T")[0];
@@ -1106,14 +1106,15 @@ async function loadAllUserReportSheet() {
       let bought = userCanadaOrders.filter(
         (o) => !o.status || !o.status.toLowerCase().includes("cancel"),
       ).length;
-      let otps = userCanadaOrders.filter(
-        (o) => o.status && o.status.toLowerCase().includes("success"),
-      ).length;
+
+      // 🟢 Bought এবং Success সংখ্যা একদম সমান রাখা হলো
+      let otps = bought;
+
       let canceled = userCanadaOrders.filter(
         (o) => o.status && o.status.toLowerCase().includes("cancel"),
       ).length;
 
-      // 🟢 Numbers Bought কে 0.12$ দিয়ে গুণ করে Total Spent হিসাব করা হলো
+      // Numbers Bought কে 0.12$ দিয়ে গুণ করে Total Spent হিসাব করা হলো
       let investment = bought * 0.12;
 
       return { email: user.email, bought, otps, canceled, investment };
@@ -1197,7 +1198,7 @@ async function loadAllUserReportSheet() {
   }
 }
 
-// === OPEN LIFETIME MODAL (Total Spent = Bought * 0.12$) ===
+// === OPEN LIFETIME MODAL (Bought & Success Same Count) ===
 async function openUserLifetimeModal(targetEmail) {
   const modal = document.getElementById("userLifetimeModal");
   const modalEmail = document.getElementById("modalUserEmail");
@@ -1226,9 +1227,8 @@ async function openUserLifetimeModal(targetEmail) {
         grouped[dateStr].canceled += 1;
       } else {
         grouped[dateStr].bought += 1;
-        if (status.includes("success")) {
-          grouped[dateStr].otps += 1;
-        }
+        // 🟢 Lifetime মডালেও Bought এবং Success সমান রাখা হলো
+        grouped[dateStr].otps += 1;
       }
     });
 
@@ -1238,7 +1238,6 @@ async function openUserLifetimeModal(targetEmail) {
       .reverse()
       .forEach((date) => {
         const info = grouped[date];
-        // 🟢 Lifetime মডালেও Numbers Bought * 0.12$ হিসাব করা হলো
         const inv = info.bought * 0.12;
         const row = document.createElement("tr");
         row.className = "hover:bg-slate-50 transition";
