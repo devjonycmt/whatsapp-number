@@ -1056,7 +1056,7 @@ async function fetchGlobalActivityLog() {
         actionText = `canceled Canada order <span class="text-slate-300">#${item.order_id || ""}</span> (${maskedPhone})`;
       } else if (item.action_type === "CANADA_NEW_ORDER") {
         badge = `<span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded text-[10px] font-bold">CANADA ORDER</span>`;
-        actionText = `purchased Canada stock number <span class="text-slate-300">${maskedPhone}</span> (#${item.order_id || ""})`;
+        actionText = `purchased Canada number <span class="text-slate-300">${maskedPhone}</span> (#${item.order_id || ""})`;
       } else {
         badge = `<span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded text-[10px] font-bold">ACTIVITY</span>`;
         actionText = `performed action for <span class="text-slate-300">${maskedPhone}</span>`;
@@ -2744,3 +2744,120 @@ async function markReminderCompleted(noteId) {
   showToast("Reminder marked as completed!");
   fetchOrderReminders();
 }
+
+// === EXACT LIVE ACTIVITY FEED TOAST SYNCHRONIZER ===
+
+// ১. ফোন নম্বরের মাঝখানের ডিজিট *** দিয়ে হাইড করার ফাংশন
+function maskPhoneNumbersInText(text) {
+  if (!text) return "";
+  return String(text).replace(/(\+?\d{4})\d+(\d{4})/g, "$1***$2");
+}
+
+// ২. টোস্ট রেন্ডার করার ফাংশন
+function showActivityToast(type, message) {
+  let container = document.getElementById("liveActivityToastContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "liveActivityToastContainer";
+    container.className =
+      "fixed bottom-5 left-5 z-[9999] flex flex-col gap-2.5 pointer-events-none max-w-sm w-full";
+    document.body.appendChild(container);
+  }
+
+  const isSuccess = type && type.toLowerCase().includes("success");
+  const isOrder = type && type.toLowerCase().includes("order");
+
+  let badgeClass = "bg-blue-500/20 text-blue-400 border-blue-500/30";
+  let iconHtml = '<i class="fa-solid fa-bolt text-blue-400"></i>';
+
+  if (isSuccess) {
+    badgeClass = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+    iconHtml = '<i class="fa-solid fa-circle-check text-emerald-400"></i>';
+  } else if (isOrder) {
+    badgeClass = "bg-indigo-500/20 text-indigo-400 border-indigo-500/30";
+    iconHtml = '<i class="fa-solid fa-cart-shopping text-indigo-400"></i>';
+  }
+
+  const safeMaskedMessage = maskPhoneNumbersInText(message);
+
+  const toast = document.createElement("div");
+  toast.className =
+    "pointer-events-auto bg-[#0f172a]/95 backdrop-blur-md border border-slate-700/80 text-white p-3.5 rounded-2xl shadow-2xl flex items-start gap-3 transform transition-all duration-300 translate-y-4 opacity-0";
+
+  toast.innerHTML = `
+    <div class="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center flex-shrink-0 mt-0.5 text-sm">
+      ${iconHtml}
+    </div>
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center justify-between gap-2 mb-1">
+        <span class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border ${badgeClass}">
+          ${type || "CANADA ORDER"}
+        </span>
+        <span class="text-[10px] text-slate-400 font-mono">Just Now</span>
+      </div>
+      <p class="text-xs text-slate-200 leading-snug break-words font-medium">${safeMaskedMessage}</p>
+    </div>
+  `;
+
+  container.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.remove("translate-y-4", "opacity-0");
+    toast.classList.add("translate-y-0", "opacity-100");
+  });
+
+  setTimeout(() => {
+    toast.classList.remove("translate-y-0", "opacity-100");
+    toast.classList.add("translate-y-4", "opacity-0");
+    setTimeout(() => toast.remove(), 300);
+  }, 5000);
+}
+
+// ৩. ড্যাশবোর্ডের ফিডের মতো হুবহু মেসেজ তৈরি করে টোস্টে পাঠানোর রিয়েল-টাইম লিসেনার
+function initLiveActivityToasts() {
+  if (!_supabase || window._activityToastSubscribed) return;
+  window._activityToastSubscribed = true;
+
+  _supabase
+    .channel("live-activity-toasts")
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "system_logs" },
+      (payload) => {
+        const log = payload.new;
+        if (!log) return;
+
+        // ড্যাশবোর্ডের ফিডে যেভাবে টাইপ ও মেসেজ তৈরি হয়
+        const logType =
+          log.action_type || log.type || log.event_type || "CANADA ORDER";
+        const email = log.user_email || log.email || "user@nexa.com";
+        const actionDesc =
+          log.description ||
+          log.action_desc ||
+          log.message ||
+          log.details ||
+          "purchased Canada number";
+        const phone = log.phone_number
+          ? maskPhoneNumbersInText(log.phone_number)
+          : log.number
+            ? maskPhoneNumbersInText(log.number)
+            : "";
+        const orderId = log.order_id
+          ? `(#${log.order_id.replace("#", "")})`
+          : "";
+
+        // হুবহু স্ক্রিনশটের ফিডের ফরম্যাট অনুযায়ী টেক্সট সাজানো
+        // যেমন: nayan145@nexa.com purchased Canada stock number +122***7348 (#CAD-618219)
+        const formattedMsg = `${email} ${actionDesc} ${phone} ${orderId}`
+          .replace(/\s+/g, " ")
+          .trim();
+
+        showActivityToast(logType, formattedMsg);
+      },
+    )
+    .subscribe();
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  setTimeout(initLiveActivityToasts, 1500);
+});
