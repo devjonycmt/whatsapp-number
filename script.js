@@ -498,7 +498,7 @@ function switchTab(tab) {
   }
 }
 
-// === USER SPECIFIC DASHBOARD STATS (Live Updated for Canada & WhatsApp) ===
+// === USER SPECIFIC DASHBOARD STATS (Not Work = Today Order - Success Number) ===
 async function fetchDashboardStats() {
   if (!_supabase || !loggedInUser) return;
   const todayStr = new Date().toISOString().split("T")[0];
@@ -531,7 +531,7 @@ async function fetchDashboardStats() {
     if (statInvestment) statInvestment.innerText = `৳${totalSpent.toFixed(2)}`;
   }
 
-  // 2. 🇨🇦 Canada Stock Stats Fetch (Fixed & Real-time Live)
+  // 2. 🇨🇦 Canada Stock Stats Fetch
   const { data: caData } = await _supabase
     .from("canada_orders")
     .select("*")
@@ -539,25 +539,31 @@ async function fetchDashboardStats() {
     .gte("created_at", todayStr);
 
   if (caData) {
-    // Numbers Bought = মোট যতগুলো অর্ডার হয়েছে (যেগুলো ক্যানসেল হয়নি)
-    let caBought = caData.filter(
-      (o) => !o.status || !o.status.toLowerCase().includes("cancel"),
+    // ১. Today Order Number = আজকে মোট যতগুলো অর্ডার হয়েছে
+    let caTodayOrder = caData.length;
+
+    // ২. Success Number = যেগুলোর স্ট্যাটাস "Success"
+    let caSuccess = caData.filter(
+      (o) => o.status && o.status.toLowerCase().includes("success"),
     ).length;
 
-    // Canceled Orders = যেগুলোর স্ট্যাটাসে cancel রয়েছে
-    let caCanceled = caData.filter(
-      (o) => o.status && o.status.toLowerCase().includes("cancel"),
-    ).length;
+    // ৩. Not Work Number = Today Order Number - Success Number
+    let caNotWork = caTodayOrder - caSuccess;
+    if (caNotWork < 0) caNotWork = 0;
 
-    // Total Spent = Numbers Bought * 0.12$
-    let caSpent = caBought * 0.12;
+    // ৪. Total Spent = Success Number * 0.12$
+    let caSpent = caSuccess * 0.12;
 
-    const statCanadaBought = document.getElementById("statCanadaBought");
-    const statCanadaCanceled = document.getElementById("statCanadaCanceled");
+    const statCanadaTodayOrder = document.getElementById(
+      "statCanadaTodayOrder",
+    );
+    const statCanadaSuccess = document.getElementById("statCanadaSuccess");
+    const statCanadaNotWork = document.getElementById("statCanadaNotWork");
     const statCanadaSpent = document.getElementById("statCanadaSpent");
 
-    if (statCanadaBought) statCanadaBought.innerText = caBought;
-    if (statCanadaCanceled) statCanadaCanceled.innerText = caCanceled;
+    if (statCanadaTodayOrder) statCanadaTodayOrder.innerText = caTodayOrder;
+    if (statCanadaSuccess) statCanadaSuccess.innerText = caSuccess;
+    if (statCanadaNotWork) statCanadaNotWork.innerText = caNotWork;
     if (statCanadaSpent) statCanadaSpent.innerText = `$${caSpent.toFixed(2)}`;
   }
 
@@ -565,7 +571,6 @@ async function fetchDashboardStats() {
     updateUserLimitSidebar();
   }
 }
-
 // === FETCH USER SPECIFIC ORDER HISTORY ===
 async function fetchOrderHistory() {
   if (!_supabase || !loggedInUser || !historyTableBody) return;
@@ -1014,7 +1019,7 @@ async function checkForNewActivity() {
   }
 }
 
-// === ৪. FETCH GLOBAL ACTIVITY LOG (Updated to Support Canada Activities) ===
+// === FETCH GLOBAL ACTIVITY LOG (Shows all activities with masked phone numbers) ===
 async function fetchGlobalActivityLog() {
   const container = document.getElementById("globalActivityLog");
   if (!container || !_supabase) return;
@@ -1028,6 +1033,7 @@ async function fetchGlobalActivityLog() {
   if (data && data.length > 0) {
     data.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     container.innerHTML = "";
+
     data.forEach((item, index) => {
       const fullEmail = item.user_email || "user@unknown.com";
       const timeStr = new Date(item.created_at).toLocaleTimeString([], {
@@ -1036,29 +1042,24 @@ async function fetchGlobalActivityLog() {
         second: "2-digit",
       });
 
+      // 🟢 নাম্বারের মাঝখানে **** বসিয়ে মাস্কিং করা হলো
+      const maskedPhone = maskPhoneNumber(item.phone_number);
+
       let badge = "";
       let actionText = "";
 
-      if (item.action_type === "CANCELED") {
-        badge = `<span class="bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded text-[10px] font-bold">CANCELED</span>`;
-        actionText = `canceled order <span class="text-slate-300">#${item.order_id || ""}</span> (${item.phone_number || ""})`;
-      } else if (item.action_type === "OTP_RECEIVED") {
-        badge = `<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-bold">OTP RECEIVED</span>`;
-        actionText = `received OTP <span class="text-emerald-300 font-bold">[${item.otp_code}]</span> for <span class="text-slate-300">${item.phone_number || ""}</span>`;
-      }
-      // 🇨🇦 ক্যানাডা স্টক অ্যাক্টিভিটি ব্যাজ ও টেক্সট ডিজাইন
-      else if (item.action_type === "CANADA_NEW_ORDER") {
-        badge = `<span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded text-[10px] font-bold">CANADA ORDER</span>`;
-        actionText = `purchased Canada stock number <span class="text-slate-300">${item.phone_number || ""}</span> (#${item.order_id || ""})`;
+      if (item.action_type === "CANADA_SUCCESS") {
+        badge = `<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-bold">CANADA SUCCESS</span>`;
+        actionText = `successfully completed Canada order <span class="text-slate-300">#${item.order_id || ""}</span> (${maskedPhone})`;
       } else if (item.action_type === "CANADA_CANCELED") {
         badge = `<span class="bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded text-[10px] font-bold">CANADA CANCELED</span>`;
-        actionText = `canceled Canada order <span class="text-slate-300">#${item.order_id || ""}</span> (${item.phone_number || ""})`;
-      } else if (item.action_type === "CANADA_SUCCESS") {
-        badge = `<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-bold">CANADA SUCCESS</span>`;
-        actionText = `marked Canada order <span class="text-slate-300">#${item.order_id || ""}</span> as success (${item.phone_number || ""})`;
+        actionText = `canceled Canada order <span class="text-slate-300">#${item.order_id || ""}</span> (${maskedPhone})`;
+      } else if (item.action_type === "CANADA_NEW_ORDER") {
+        badge = `<span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded text-[10px] font-bold">CANADA ORDER</span>`;
+        actionText = `purchased Canada stock number <span class="text-slate-300">${maskedPhone}</span> (#${item.order_id || ""})`;
       } else {
-        badge = `<span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded text-[10px] font-bold">NEW ORDER</span>`;
-        actionText = `purchased WhatsApp number <span class="text-slate-300">${item.phone_number || ""}</span>`;
+        badge = `<span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded text-[10px] font-bold">ACTIVITY</span>`;
+        actionText = `performed action for <span class="text-slate-300">${maskedPhone}</span>`;
       }
 
       const logRow = document.createElement("div");
@@ -1080,13 +1081,17 @@ async function fetchGlobalActivityLog() {
     container.innerHTML = `<div class="text-slate-500 italic py-2">No platform activity recorded yet.</div>`;
   }
 }
-// === LOAD ALL USERS REPORT SHEET (Bought & Success Same Count) ===
 async function loadAllUserReportSheet() {
   if (!_supabase) return;
   const todayStr = new Date().toISOString().split("T")[0];
   const topWinnerCard = document.getElementById("topWinnerCard");
   const otherUsersList = document.getElementById("otherUsersList");
-  if (!topWinnerCard || !otherUsersList) return;
+  if (!otherUsersList) return;
+
+  if (topWinnerCard) {
+    topWinnerCard.classList.add("hidden");
+    topWinnerCard.innerHTML = "";
+  }
 
   const { data: usersData } = await _supabase
     .from("user_profiles")
@@ -1097,108 +1102,104 @@ async function loadAllUserReportSheet() {
     .select("*")
     .gte("created_at", todayStr);
 
+  // 🟢 সমস্ত ইউজারের আজকের টোটাল কাউন্ট হিসাব করার জন্য ভ্যারিয়েবল
+  let globalTotalOrder = 0;
+  let globalTotalSuccess = 0;
+  let globalTotalNotWork = 0;
+  let globalTotalSpent = 0;
+
   if (usersData && usersData.length > 0) {
     const userReports = usersData.map((user) => {
       const userCanadaOrders = canadaOrdersData
         ? canadaOrdersData.filter((o) => o.user_email === user.email)
         : [];
 
-      let bought = userCanadaOrders.filter(
-        (o) => !o.status || !o.status.toLowerCase().includes("cancel"),
+      let totalOrder = userCanadaOrders.length;
+      let successCount = userCanadaOrders.filter(
+        (o) => o.status && o.status.toLowerCase().includes("success"),
       ).length;
+      let notWork = totalOrder - successCount;
+      if (notWork < 0) notWork = 0;
+      let investment = successCount * 0.12;
 
-      // 🟢 Bought এবং Success সংখ্যা একদম সমান রাখা হলো
-      let otps = bought;
+      // গ্লোবাল ٹوٹাল যোগ করা
+      globalTotalOrder += totalOrder;
+      globalTotalSuccess += successCount;
+      globalTotalNotWork += notWork;
+      globalTotalSpent += investment;
 
-      let canceled = userCanadaOrders.filter(
-        (o) => o.status && o.status.toLowerCase().includes("cancel"),
-      ).length;
-
-      // Numbers Bought কে 0.12$ দিয়ে গুণ করে Total Spent হিসাব করা হলো
-      let investment = bought * 0.12;
-
-      return { email: user.email, bought, otps, canceled, investment };
+      return {
+        email: user.email,
+        totalOrder,
+        success: successCount,
+        notWork,
+        investment,
+      };
     });
 
-    userReports.sort((a, b) => b.bought - a.bought || b.otps - a.otps);
-    const firstUser = userReports[0];
-    const otherUsers = userReports.slice(1);
+    // 🟢 ওপরের ৪টি স্ট্যাট কার্ড DOM-এ আপডেট করা
+    const elTotalOrder = document.getElementById("reportTotalOrder");
+    const elTotalSuccess = document.getElementById("reportTotalSuccess");
+    const elTotalNotWork = document.getElementById("reportTotalNotWork");
+    const elTotalSpent = document.getElementById("reportTotalSpent");
 
-    if (firstUser && firstUser.bought > 0) {
-      topWinnerCard.classList.remove("hidden");
-      topWinnerCard.innerHTML = `
-        <div class="bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl border border-amber-500/40 relative overflow-hidden flex flex-col items-center text-center">
-          <div class="absolute -right-10 -top-10 w-48 h-48 bg-amber-500/15 rounded-full blur-3xl"></div>
-          <div class="relative mb-3 flex items-center justify-center">
-            <div class="w-14 h-14 rounded-full bg-gradient-to-tr from-amber-500 via-yellow-400 to-amber-300 text-slate-950 font-black text-2xl flex items-center justify-center shadow-lg shadow-amber-500/40 animate-bounce border-2 border-white">
-              <span>1</span>
-            </div>
-            <i class="fa-solid fa-star text-amber-400 text-xs absolute -bottom-1 bg-slate-950 rounded-full p-0.5 border border-amber-400"></i>
-          </div>
-          <span class="text-[11px] uppercase tracking-widest text-amber-400 font-extrabold mt-1 mb-1 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-            <i class="fa-solid fa-crown mr-1 text-amber-400"></i> Top Performer of Today (Canada Stock)
-          </span>
-          <h2 class="text-xl sm:text-2xl font-black text-white mb-2">${firstUser.email}</h2>
-          <button onclick="openUserLifetimeModal('${firstUser.email}')" class="mb-4 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5">
-            <i class="fa-solid fa-eye"></i> View Lifetime History
-          </button>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3.5 w-full max-w-xl mt-2 pt-4 border-t border-slate-800/80 text-xs">
-            <div class="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
-              <span class="text-slate-400 block mb-1 font-medium">Numbers Bought</span>
-              <span class="text-blue-400 font-black text-base">${firstUser.bought}</span>
-            </div>
-            <div class="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
-              <span class="text-slate-400 block mb-1 font-medium">Success Completed</span>
-              <span class="text-emerald-400 font-black text-base">${firstUser.otps}</span>
-            </div>
-            <div class="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
-              <span class="text-slate-400 block mb-1 font-medium">Canceled</span>
-              <span class="text-rose-400 font-black text-base">${firstUser.canceled}</span>
-            </div>
-            <div class="bg-slate-950/60 p-3.5 rounded-2xl border border-amber-500/30 bg-amber-500/5">
-              <span class="text-amber-300 block mb-1 font-medium">Total Spent</span>
-              <span class="text-amber-400 font-black text-base">$${firstUser.investment.toFixed(2)}</span>
-            </div>
-          </div>
-        </div>
-      `;
-    } else {
-      topWinnerCard.classList.add("hidden");
-    }
+    if (elTotalOrder) elTotalOrder.innerText = globalTotalOrder;
+    if (elTotalSuccess) elTotalSuccess.innerText = globalTotalSuccess;
+    if (elTotalNotWork) elTotalNotWork.innerText = globalTotalNotWork;
+    if (elTotalSpent)
+      elTotalSpent.innerText = `$${globalTotalSpent.toFixed(2)}`;
+
+    // Success সংখ্যার ভিত্তিতে সর্টিং (টপ পারফর্মার উপরে থাকবে)
+    userReports.sort(
+      (a, b) => b.success - a.success || b.totalOrder - a.totalOrder,
+    );
 
     otherUsersList.innerHTML = "";
-    if (otherUsers.length > 0) {
-      otherUsers.forEach((user, index) => {
-        const rank = index + 2;
-        const row = document.createElement("div");
-        row.className =
-          "flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 hover:bg-slate-100/80 p-4 rounded-2xl border border-slate-200/60 transition";
-        row.innerHTML = `
-          <div class="flex items-center gap-3.5">
-            <span class="w-9 h-9 rounded-xl bg-slate-200/80 text-slate-700 font-black text-xs flex items-center justify-center font-mono shadow-sm">#${rank}</span>
-            <div>
+
+    userReports.forEach((user, index) => {
+      const rank = index + 1;
+      const isTopOne = index === 0 && user.success > 0;
+
+      const topBadgeHtml = isTopOne
+        ? `<span class="inline-flex items-center gap-1 bg-amber-100 text-amber-700 border border-amber-300 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm">
+             <i class="fa-solid fa-crown text-amber-500"></i> TOP 1
+           </span>`
+        : "";
+
+      const row = document.createElement("div");
+      row.className = isTopOne
+        ? "flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-50/40 hover:bg-amber-50/70 p-4 rounded-2xl border border-amber-200/80 transition"
+        : "flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 hover:bg-slate-100/80 p-4 rounded-2xl border border-slate-200/60 transition";
+
+      row.innerHTML = `
+        <div class="flex items-center gap-3.5">
+          <span class="w-9 h-9 rounded-xl ${isTopOne ? "bg-amber-400 text-slate-950" : "bg-slate-200/80 text-slate-700"} font-black text-xs flex items-center justify-center font-mono shadow-sm">#${rank}</span>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
               <h4 class="text-sm font-bold text-slate-900">${user.email}</h4>
-              <p class="text-[11px] text-slate-500 font-medium mt-0.5">Bought: <span class="text-blue-600 font-bold">${user.bought}</span> | Success: <span class="text-emerald-600 font-bold">${user.otps}</span> | Canceled: <span class="text-rose-600 font-bold">${user.canceled}</span></p>
+              ${topBadgeHtml}
             </div>
+            <p class="text-[11px] text-slate-500 font-medium mt-0.5">
+              Total Order: <span class="text-blue-600 font-bold">${user.totalOrder}</span> | 
+              Success: <span class="text-emerald-600 font-bold">${user.success}</span> | 
+              Not Work: <span class="text-rose-600 font-bold">${user.notWork}</span>
+            </p>
           </div>
-          <div class="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-0 pt-2 sm:pt-0 border-slate-200">
-            <button onclick="openUserLifetimeModal('${user.email}')" class="bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1">
-              <i class="fa-solid fa-eye"></i> View Report
-            </button>
-            <span class="text-sm font-black text-amber-600 font-mono">$${user.investment.toFixed(2)}</span>
-          </div>
-        `;
-        otherUsersList.appendChild(row);
-      });
-    } else {
-      otherUsersList.innerHTML = `<div class="text-center py-6 text-slate-400 text-sm">No other performers for today.</div>`;
-    }
+        </div>
+        <div class="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-0 pt-2 sm:pt-0 border-slate-200">
+          <button onclick="openUserLifetimeModal('${user.email}')" class="bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1">
+            <i class="fa-solid fa-eye"></i> View Report
+          </button>
+          <span class="text-sm font-black text-amber-600 font-mono">$${user.investment.toFixed(2)}</span>
+        </div>
+      `;
+      otherUsersList.appendChild(row);
+    });
   } else {
     otherUsersList.innerHTML = `<div class="text-center py-6 text-slate-400 text-sm">No users found.</div>`;
   }
 }
 
-// === OPEN LIFETIME MODAL (Bought & Success Same Count) ===
 async function openUserLifetimeModal(targetEmail) {
   const modal = document.getElementById("userLifetimeModal");
   const modalEmail = document.getElementById("modalUserEmail");
@@ -1219,16 +1220,13 @@ async function openUserLifetimeModal(targetEmail) {
     const grouped = {};
     caData.forEach((order) => {
       const dateStr = new Date(order.created_at).toISOString().split("T")[0];
-      if (!grouped[dateStr])
-        grouped[dateStr] = { bought: 0, otps: 0, canceled: 0 };
+      if (!grouped[dateStr]) grouped[dateStr] = { totalOrder: 0, success: 0 };
+
+      grouped[dateStr].totalOrder += 1;
 
       const status = (order.status || "").toLowerCase();
-      if (status.includes("cancel")) {
-        grouped[dateStr].canceled += 1;
-      } else {
-        grouped[dateStr].bought += 1;
-        // 🟢 Lifetime মডালেও Bought এবং Success সমান রাখা হলো
-        grouped[dateStr].otps += 1;
+      if (status.includes("success")) {
+        grouped[dateStr].success += 1;
       }
     });
 
@@ -1238,16 +1236,19 @@ async function openUserLifetimeModal(targetEmail) {
       .reverse()
       .forEach((date) => {
         const info = grouped[date];
-        const inv = info.bought * 0.12;
+        let notWork = info.totalOrder - info.success;
+        if (notWork < 0) notWork = 0;
+
+        const inv = info.success * 0.12;
         const row = document.createElement("tr");
         row.className = "hover:bg-slate-50 transition";
         row.innerHTML = `
-        <td class="py-3 px-4 font-mono text-xs font-bold text-slate-800">${date}</td>
-        <td class="py-3 px-4 text-blue-600 font-bold">${info.bought}</td>
-        <td class="py-3 px-4 text-emerald-600 font-bold">${info.otps}</td>
-        <td class="py-3 px-4 text-rose-600 font-bold">${info.canceled}</td>
-        <td class="py-3 px-4 text-amber-600 font-bold">$${inv.toFixed(2)}</td>
-      `;
+          <td class="py-3 px-4 font-mono text-xs font-bold text-slate-800">${date}</td>
+          <td class="py-3 px-4 text-blue-600 font-bold">${info.totalOrder}</td>
+          <td class="py-3 px-4 text-emerald-600 font-bold">${info.success}</td>
+          <td class="py-3 px-4 text-rose-600 font-bold">${notWork}</td>
+          <td class="py-3 px-4 text-amber-600 font-bold">$${inv.toFixed(2)}</td>
+        `;
         tbody.appendChild(row);
       });
   } else {
@@ -1436,7 +1437,7 @@ async function submitBulkWhatsAppNumbers() {
   }
 }
 
-// === ১. BUY CANADA NUMBER (Per-User 10-Hour Cooldown Check) ===
+// === BUY CANADA NUMBER (Per-User 10-Hour Cooldown & Success-Only Model) ===
 async function buyCanadaNumber() {
   if (!_supabase || !loggedInUser) return;
 
@@ -1482,7 +1483,7 @@ async function buyCanadaNumber() {
       return;
     }
 
-    // ৩. ইউজারের নিজস্ব রেস্ট্রিক্টেড নাম্বারগুলো স্টক থেকে বাদ দেওয়া (অন্য কেউ নিক বা না নিক, এই ইউজারের জন্য ব্লক থাকবে)
+    // ৩. ইউজারের নিজস্ব রেস্ট্রিক্টেড নাম্বারগুলো স্টক থেকে বাদ দেওয়া
     let userFilteredStock = availableStock.filter(
       (item) => !restrictedPhones.includes(item.phone_number),
     );
@@ -1532,12 +1533,13 @@ async function buyCanadaNumber() {
     const stockLinkStr = assignedStock.link || "https://sms.elitetrick.com/";
     const dhakaTimeIns = new Date().toISOString();
 
+    // 🟢 ৪. অর্ডার ইনসার্ট করার সময় স্ট্যাটাস "Order Confirm" সেট করা হলো
     await _supabase.from("canada_orders").insert([
       {
         order_id: String(cadOrderId),
         phone_number: phoneNumberStr,
         otp: stockLinkStr,
-        status: "Confirmed",
+        status: "Order Confirm",
         user_email: loggedInUser.email,
         created_at: dhakaTimeIns,
       },
@@ -1567,26 +1569,20 @@ async function buyCanadaNumber() {
     document.getElementById("canadaPhoneNumber").innerText = phoneNumberStr;
     document.getElementById("canadaOtpCode").innerText = stockLinkStr;
     document.getElementById("canadaOrderStatusText").innerText =
-      "Confirmed (Stock)";
+      "Order Confirm";
 
-    const cancelBtn = document.getElementById("canadaBtnCancelOrder");
+    // 🟢 ৫. Success Completed বাটন কনফিগার করা
     const successBtn = document.getElementById("canadaBtnSuccessOrder");
 
-    if (cancelBtn) {
-      cancelBtn.disabled = false;
-      cancelBtn.setAttribute(
-        "onclick",
-        `cancelCanadaActiveOrder('${cadOrderId}')`,
-      );
-      cancelBtn.classList.remove("opacity-50", "cursor-not-allowed");
-    }
     if (successBtn) {
       successBtn.disabled = false;
       successBtn.setAttribute(
         "onclick",
         `completeCanadaActiveOrder('${cadOrderId}')`,
       );
-      successBtn.classList.remove("opacity-50", "cursor-not-allowed");
+      successBtn.className =
+        "w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl text-sm transition shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]";
+      successBtn.innerHTML = `<i class="fa-solid fa-circle-check text-base"></i> Success Completed`;
     }
 
     document.getElementById("canadaBuySection").classList.add("hidden");
@@ -1609,7 +1605,137 @@ async function buyCanadaNumber() {
     }
   }
 }
+// === MARK CANADA ORDER AS SUCCESS (Only Success, No Refund & Logs Activity) ===
+async function completeCanadaActiveOrder(specificId) {
+  const orderId =
+    specificId || document.getElementById("canadaActivationId").innerText;
+  if (!orderId || orderId === "-") return;
 
+  if (
+    !confirm(
+      "Are you sure you want to mark this Canada order as Success Completed?",
+    )
+  )
+    return;
+
+  showToast("Updating order status to Success...");
+
+  try {
+    const cleanId = String(orderId).replace("#", "").trim();
+
+    // অর্ডার থেকে ফোন নাম্বারটি বের করে নেওয়া
+    const { data: orderData } = await _supabase
+      .from("canada_orders")
+      .select("phone_number")
+      .eq("order_id", cleanId)
+      .maybeSingle();
+
+    const phoneNum = orderData ? orderData.phone_number : "";
+
+    // ১. স্ট্যাটাস Success আপডেট করা
+    await _supabase
+      .from("canada_orders")
+      .update({ status: "Success" })
+      .eq("order_id", cleanId);
+
+    // ২. 🟢 শুধুমাত্র Success হলে অ্যাক্টিভিটি ফিডে দেখানোর জন্য সিস্টেম লগ রেকর্ড করা
+    await recordSystemLog(
+      loggedInUser.email,
+      "CANADA_SUCCESS",
+      cleanId,
+      phoneNum,
+    );
+
+    const statusEl = document.getElementById("canadaOrderStatusText");
+    if (statusEl) {
+      statusEl.innerText = "Success (Completed)";
+      statusEl.className = "text-emerald-600 font-bold text-base mt-1";
+    }
+
+    const successBtn = document.getElementById("canadaBtnSuccessOrder");
+    if (successBtn) {
+      successBtn.disabled = true;
+      successBtn.className =
+        "w-full bg-slate-100 text-slate-400 font-bold py-3.5 px-4 rounded-xl text-sm cursor-not-allowed flex items-center justify-center gap-2";
+      successBtn.innerHTML = `<i class="fa-solid fa-check-double"></i> Completed`;
+    }
+
+    showToast("Canada order marked as Success successfully!");
+
+    if (typeof fetchDashboardStats === "function") fetchDashboardStats();
+
+    setTimeout(() => {
+      if (typeof resetCanadaBuyView === "function") {
+        resetCanadaBuyView();
+      }
+    }, 1500);
+  } catch (e) {
+    console.error("Success Canada error:", e);
+    showToast("Error updating Canada order: " + e.message, true);
+  }
+}
+// === ৩. VIEW CANADA ORDER FROM HISTORY ===
+async function viewCanadaOrder(orderId) {
+  if (!_supabase) return;
+
+  try {
+    const cleanId = String(orderId).replace("#", "").trim();
+    const { data: order, error } = await _supabase
+      .from("canada_orders")
+      .select("*")
+      .eq("order_id", cleanId)
+      .single();
+
+    if (error || !order) {
+      showToast("Order details not found!", true);
+      return;
+    }
+
+    document.getElementById("canadaOrderTitle").innerText =
+      `Canada Order #${order.order_id}`;
+    document.getElementById("canadaActivationId").innerText = order.order_id;
+    document.getElementById("canadaPhoneNumber").innerText =
+      order.phone_number || "-";
+    document.getElementById("canadaOtpCode").innerText = order.otp || "-";
+
+    const statusEl = document.getElementById("canadaOrderStatusText");
+    const successBtn = document.getElementById("canadaBtnSuccessOrder");
+
+    statusEl.innerText = order.status;
+
+    if (order.status && order.status.toLowerCase().includes("success")) {
+      statusEl.className = "text-emerald-600 font-bold text-base mt-1";
+      if (successBtn) {
+        successBtn.disabled = true;
+        successBtn.className =
+          "w-full bg-slate-100 text-slate-400 font-bold py-3.5 px-4 rounded-xl text-sm cursor-not-allowed flex items-center justify-center gap-2";
+        successBtn.innerHTML = `<i class="fa-solid fa-check-double"></i> Completed`;
+      }
+    } else {
+      statusEl.className = "text-emerald-600 font-bold text-base mt-1";
+      if (successBtn) {
+        successBtn.disabled = false;
+        successBtn.setAttribute(
+          "onclick",
+          `completeCanadaActiveOrder('${order.order_id}')`,
+        );
+        successBtn.className =
+          "w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl text-sm transition shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]";
+        successBtn.innerHTML = `<i class="fa-solid fa-circle-check text-base"></i> Success Completed`;
+      }
+    }
+
+    document.getElementById("canadaBuySection").classList.add("hidden");
+    document.getElementById("canadaOrderCard").classList.remove("hidden");
+
+    const canadaHistorySection = document.getElementById(
+      "canadaHistorySection",
+    );
+    if (canadaHistorySection) canadaHistorySection.classList.add("hidden");
+  } catch (e) {
+    console.error("View order error:", e);
+  }
+}
 // === ২. CANCEL CANADA ORDER (Adds 10-Hour Cooldown Record for this User) ===
 async function cancelCanadaActiveOrder(specificId) {
   const orderId =
@@ -1694,85 +1820,17 @@ async function cancelCanadaActiveOrder(specificId) {
     showToast("Error canceling Canada order: " + e.message, true);
   }
 }
-// === MARK CANADA ORDER AS SUCCESS ===
-async function completeCanadaActiveOrder(specificId) {
-  const orderId =
-    specificId || document.getElementById("canadaActivationId").innerText;
-  if (!orderId || orderId === "-") return;
 
-  if (
-    !confirm(
-      "Are you sure you want to mark this Canada order/account as Success?",
-    )
-  )
-    return;
-
-  showToast("Updating order status to Success...");
-
-  try {
-    const cleanId = String(orderId).replace("#", "").trim();
-
-    // 1. Update status in 'canada_orders' table to Success
-    await _supabase
-      .from("canada_orders")
-      .update({ status: "Success" })
-      .eq("order_id", cleanId);
-
-    // 2. Update UI Status text
-    const statusEl = document.getElementById("canadaOrderStatusText");
-    if (statusEl) {
-      statusEl.innerText = "Success (Completed)";
-      statusEl.className = "text-emerald-600 font-bold text-base mt-1";
-    }
-
-    // 3. Disable both buttons so they cannot be clicked again
-    const cancelBtn = document.getElementById("canadaBtnCancelOrder");
-    const successBtn = document.getElementById("canadaBtnSuccessOrder");
-
-    if (cancelBtn) {
-      cancelBtn.disabled = true;
-      cancelBtn.classList.add(
-        "opacity-50",
-        "cursor-not-allowed",
-        "bg-gray-100",
-      );
-      cancelBtn.classList.remove("hover:bg-rose-100", "cursor-pointer");
-    }
-
-    if (successBtn) {
-      successBtn.disabled = true;
-      successBtn.classList.add(
-        "opacity-50",
-        "cursor-not-allowed",
-        "bg-emerald-400",
-      );
-      successBtn.classList.remove("hover:bg-emerald-700", "cursor-pointer");
-    }
-
-    showToast("Canada order marked as Success successfully!");
-
-    // ১.৫ সেকেন্ড পর অটো রিসেট হয়ে বাই স্ক্রিন ও হিস্ট্রি টেবিলে ফিরে যাবে
-    setTimeout(() => {
-      if (typeof resetCanadaBuyView === "function") {
-        resetCanadaBuyView();
-      }
-    }, 1500);
-  } catch (e) {
-    console.error("Success Canada error:", e);
-    showToast("Error updating Canada order: " + e.message, true);
-  }
-}
-// === FETCH CANADA HISTORY (Newest/Latest order always at the top based on Serial/ID) ===
+// === FETCH CANADA HISTORY ===
 async function fetchCanadaHistory() {
   if (!_supabase || !loggedInUser) return;
 
   try {
-    // 🟢 আইডি (id) অথবা সিরিয়াল অনুযায়ী ডিসেন্ডিং অর্ডারে ফেচ করা, যাতে নতুন অর্ডার সবার উপরে থাকে
     const { data, error } = await _supabase
       .from("canada_orders")
       .select("*")
       .eq("user_email", loggedInUser.email)
-      .order("id", { ascending: false }); // অথবা .order("created_at", { ascending: false })
+      .order("id", { ascending: false });
 
     if (error) throw error;
 
@@ -1788,20 +1846,20 @@ async function fetchCanadaHistory() {
 
     data.forEach((order) => {
       let statusBadge = "";
-      if (order.status && order.status.toLowerCase().includes("cancel")) {
+      const statusLower = (order.status || "").toLowerCase();
+
+      if (statusLower.includes("cancel")) {
         statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-100 whitespace-nowrap">
                         <i class="fa-solid fa-circle-xmark mr-1"></i> Canceled & Refunded
                       </span>`;
-      } else if (
-        order.status &&
-        order.status.toLowerCase().includes("success")
-      ) {
+      } else if (statusLower.includes("success")) {
         statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100 whitespace-nowrap">
                         <i class="fa-solid fa-circle-check mr-1"></i> Success (Completed)
                       </span>`;
       } else {
-        statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100 whitespace-nowrap">
-                        <i class="fa-solid fa-circle-check mr-1"></i> ${order.status}
+        // 🟢 নতুন অর্ডারের ক্ষেত্রে হিস্ট্রিতে "Order Confirm" দেখাবে
+        statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap">
+                        <i class="fa-solid fa-circle-check mr-1"></i> Order Confirm
                       </span>`;
       }
 
@@ -1826,88 +1884,6 @@ async function fetchCanadaHistory() {
     });
   } catch (e) {
     console.error("Error fetching Canada history:", e);
-  }
-}
-
-// === VIEW CANADA ORDER FROM HISTORY ===
-async function viewCanadaOrder(orderId) {
-  if (!_supabase) return;
-
-  try {
-    const cleanId = String(orderId).replace("#", "").trim();
-    const { data: order, error } = await _supabase
-      .from("canada_orders")
-      .select("*")
-      .eq("order_id", cleanId)
-      .single();
-
-    if (error || !order) {
-      showToast("Order details not found!", true);
-      return;
-    }
-
-    document.getElementById("canadaOrderTitle").innerText =
-      `Canada Order #${order.order_id}`;
-    document.getElementById("canadaActivationId").innerText = order.order_id;
-    document.getElementById("canadaPhoneNumber").innerText =
-      order.phone_number || "-";
-    document.getElementById("canadaOtpCode").innerText = order.otp || "-";
-
-    // 🟢 এই সেই কোডটি, যা আপনি ওপরের অংশে দিয়েছেন:
-    const statusEl = document.getElementById("canadaOrderStatusText");
-    const cancelBtn = document.getElementById("canadaBtnCancelOrder");
-    const successBtn = document.getElementById("canadaBtnSuccessOrder");
-
-    statusEl.innerText = order.status;
-
-    if (
-      order.status &&
-      (order.status.toLowerCase().includes("cancel") ||
-        order.status.toLowerCase().includes("success"))
-    ) {
-      statusEl.className = order.status.toLowerCase().includes("success")
-        ? "text-emerald-600 font-bold text-base mt-1"
-        : "text-rose-600 font-bold text-base mt-1";
-
-      // দুটি বাটনই ডিজেবল হয়ে যাবে যদি অলরেডি প্রসেসড হয়ে থাকে
-      if (cancelBtn) {
-        cancelBtn.disabled = true;
-        cancelBtn.classList.add("opacity-50", "cursor-not-allowed");
-      }
-      if (successBtn) {
-        successBtn.disabled = true;
-        successBtn.classList.add("opacity-50", "cursor-not-allowed");
-      }
-    } else {
-      statusEl.className = "text-emerald-600 font-bold text-base mt-1";
-      if (cancelBtn) {
-        cancelBtn.disabled = false;
-        cancelBtn.setAttribute(
-          "onclick",
-          `cancelCanadaActiveOrder('${order.order_id}')`,
-        );
-        cancelBtn.classList.remove("opacity-50", "cursor-not-allowed");
-      }
-      if (successBtn) {
-        successBtn.disabled = false;
-        successBtn.setAttribute(
-          "onclick",
-          `completeCanadaActiveOrder('${order.order_id}')`,
-        );
-        successBtn.classList.remove("opacity-50", "cursor-not-allowed");
-      }
-    }
-    // ----------------------------------------------------
-
-    document.getElementById("canadaBuySection").classList.add("hidden");
-    document.getElementById("canadaOrderCard").classList.remove("hidden");
-
-    const canadaHistorySection = document.getElementById(
-      "canadaHistorySection",
-    );
-    if (canadaHistorySection) canadaHistorySection.classList.add("hidden");
-  } catch (e) {
-    console.error("View order error:", e);
   }
 }
 
@@ -2130,3 +2106,14 @@ window.addEventListener("DOMContentLoaded", () => {
   // 🟢 রিয়েল-টাইম ইভেন্ট লিসেনার অ্যাক্টিভ করা হলো
   initEventDrivenRealtime();
 });
+
+// ফোন নাম্বারের মাঝখানে ৪টি স্টার বসানোর ফাংশন
+function maskPhoneNumber(phone) {
+  if (!phone) return "-";
+  const cleanPhone = String(phone).trim();
+  if (cleanPhone.length <= 8) return cleanPhone; // ছোট নাম্বার হলে যেমন আছে তেমনই রাখবে
+
+  const start = cleanPhone.slice(0, 4);
+  const end = cleanPhone.slice(-4);
+  return `${start}***${end}`;
+}

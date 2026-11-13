@@ -383,76 +383,99 @@
               </button>
             </div>
 
-            <!-- 🇨🇦 CANADA STOCK STATS (New Section Added Above WhatsApp) -->
-            <div class="mb-6">
-              <h3
-                class="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2"
+            <!-- 🇨🇦 CANADA STOCK STATS (TODAY) - 4 Cards Grid -->
+            <div class="mb-8">
+              <div
+                class="flex items-center gap-2 text-xs font-extrabold text-blue-600 uppercase tracking-wider mb-3"
               >
-                <i class="fa-solid fa-earth-americas text-blue-500"></i> Canada
-                Stock Stats (Today)
-              </h3>
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <!-- Canada Numbers Bought -->
+                <i class="fa-solid fa-earth-americas"></i>
+                <span>CANADA STOCK STATS (TODAY)</span>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- 1. Today Order Number -->
                 <div
-                  class="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs flex items-center gap-4"
+                  class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4"
                 >
                   <div
-                    class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl shadow-xs"
+                    class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl shrink-0"
                   >
                     <i class="fa-solid fa-cart-shopping"></i>
                   </div>
                   <div>
                     <span
-                      class="text-xs font-bold text-slate-400 uppercase tracking-wider block"
-                      >NUMBERS BOUGHT</span
+                      class="text-[11px] font-bold text-slate-400 uppercase block"
+                      >TODAY ORDER</span
                     >
                     <span
-                      id="statCanadaBought"
+                      id="statCanadaTodayOrder"
                       class="text-2xl font-black text-slate-900"
                       >0</span
                     >
                   </div>
                 </div>
 
-                <!-- Canada Canceled Orders -->
+                <!-- 2. Success Number -->
                 <div
-                  class="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs flex items-center gap-4"
+                  class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4"
                 >
                   <div
-                    class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl shadow-xs"
+                    class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl shrink-0"
+                  >
+                    <i class="fa-solid fa-circle-check"></i>
+                  </div>
+                  <div>
+                    <span
+                      class="text-[11px] font-bold text-slate-400 uppercase block"
+                      >SUCCESS NUMBER</span
+                    >
+                    <span
+                      id="statCanadaSuccess"
+                      class="text-2xl font-black text-emerald-600"
+                      >0</span
+                    >
+                  </div>
+                </div>
+
+                <!-- 3. Not Work Number -->
+                <div
+                  class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4"
+                >
+                  <div
+                    class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl shrink-0"
                   >
                     <i class="fa-solid fa-ban"></i>
                   </div>
                   <div>
                     <span
-                      class="text-xs font-bold text-slate-400 uppercase tracking-wider block"
-                      >CANCELED ORDERS</span
+                      class="text-[11px] font-bold text-slate-400 uppercase block"
+                      >NOT WORK NUMBER</span
                     >
                     <span
-                      id="statCanadaCanceled"
-                      class="text-2xl font-black text-slate-900"
+                      id="statCanadaNotWork"
+                      class="text-2xl font-black text-rose-600"
                       >0</span
                     >
                   </div>
                 </div>
 
-                <!-- Canada Total Spent ($0.12 rate) -->
+                <!-- 4. Total Spent (Success * $0.12) -->
                 <div
-                  class="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs flex items-center gap-4"
+                  class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4"
                 >
                   <div
-                    class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl shadow-xs"
+                    class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center text-xl shrink-0"
                   >
                     <i class="fa-solid fa-wallet"></i>
                   </div>
                   <div>
                     <span
-                      class="text-xs font-bold text-slate-400 uppercase tracking-wider block"
+                      class="text-[11px] font-bold text-slate-400 uppercase block"
                       >TOTAL SPENT</span
                     >
                     <span
                       id="statCanadaSpent"
-                      class="text-2xl font-black text-amber-600"
+                      class="text-2xl font-black text-amber-500"
                       >$0.00</span
                     >
                   </div>
@@ -1011,11 +1034,12 @@
 
               <div class="pt-2">
                 <button
-                  id="canadaBtnCancelOrder"
-                  onclick="cancelCanadaActiveOrder()"
-                  class="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold py-3.5 px-4 rounded-2xl text-sm transition flex items-center justify-center gap-2 cursor-pointer"
+                  id="canadaBtnSuccessOrder"
+                  onclick="completeCanadaActiveOrder()"
+                  class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-2xl text-sm transition flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
                 >
-                  <i class="fa-solid fa-ban"></i> Cancel & Refund Canada Order
+                  <i class="fa-solid fa-circle-check text-base"></i> Success
+                  Completed
                 </button>
               </div>
             </div>
@@ -1380,9 +1404,111 @@
           <!-- ================= REPORT SHEET VIEW ================= -->
           <div id="reportView" class="hidden space-y-6">
             <div class="pb-4 border-b border-slate-200/80">
+              <!-- 📊 ALL USERS AGGREGATED STATS (TODAY) -->
+              <div class="mb-8">
+                <div
+                  class="flex items-center gap-2 text-xs font-extrabold text-blue-600 uppercase tracking-wider mb-3"
+                >
+                  <i class="fa-solid fa-chart-pie"></i>
+                  <span>ALL USERS TODAY OVERVIEW</span>
+                </div>
+
+                <div
+                  class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+                >
+                  <!-- 1. Today Total Order -->
+                  <div
+                    class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4"
+                  >
+                    <div
+                      class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl shrink-0"
+                    >
+                      <i class="fa-solid fa-cart-shopping"></i>
+                    </div>
+                    <div>
+                      <span
+                        class="text-[11px] font-bold text-slate-400 uppercase block"
+                        >TODAY TOTAL ORDER</span
+                      >
+                      <span
+                        id="reportTotalOrder"
+                        class="text-2xl font-black text-slate-900"
+                        >0</span
+                      >
+                    </div>
+                  </div>
+
+                  <!-- 2. Today Total Success -->
+                  <div
+                    class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4"
+                  >
+                    <div
+                      class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl shrink-0"
+                    >
+                      <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                    <div>
+                      <span
+                        class="text-[11px] font-bold text-slate-400 uppercase block"
+                        >TODAY TOTAL SUCCESS</span
+                      >
+                      <span
+                        id="reportTotalSuccess"
+                        class="text-2xl font-black text-emerald-600"
+                        >0</span
+                      >
+                    </div>
+                  </div>
+
+                  <!-- 3. Today Total Not Work -->
+                  <div
+                    class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4"
+                  >
+                    <div
+                      class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl shrink-0"
+                    >
+                      <i class="fa-solid fa-ban"></i>
+                    </div>
+                    <div>
+                      <span
+                        class="text-[11px] font-bold text-slate-400 uppercase block"
+                        >TODAY TOTAL NOT WORK</span
+                      >
+                      <span
+                        id="reportTotalNotWork"
+                        class="text-2xl font-black text-rose-600"
+                        >0</span
+                      >
+                    </div>
+                  </div>
+
+                  <!-- 4. Today Total Spent -->
+                  <div
+                    class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4"
+                  >
+                    <div
+                      class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center text-xl shrink-0"
+                    >
+                      <i class="fa-solid fa-wallet"></i>
+                    </div>
+                    <div>
+                      <span
+                        class="text-[11px] font-bold text-slate-400 uppercase block"
+                        >TODAY TOTAL SPENT</span
+                      >
+                      <span
+                        id="reportTotalSpent"
+                        class="text-2xl font-black text-amber-500"
+                        >$0.00</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
               <h1 class="text-2xl font-black text-slate-900 tracking-tight">
                 Performance Report Sheet
               </h1>
+
               <p class="text-xs text-slate-500 font-medium mt-1">
                 Top performers leaderboard for today.
               </p>
