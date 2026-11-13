@@ -1739,6 +1739,9 @@ async function viewCanadaOrder(orderId) {
   } catch (e) {
     console.error("View order error:", e);
   }
+  if (typeof fetchOrderReminders === "function") {
+    fetchOrderReminders();
+  }
 }
 // === ২. CANCEL CANADA ORDER (Adds 10-Hour Cooldown Record for this User) ===
 async function cancelCanadaActiveOrder(specificId) {
@@ -2411,4 +2414,333 @@ function reworkCanadaOrderFromHistory(orderId) {
   if (typeof viewCanadaOrder === "function") {
     viewCanadaOrder(orderId);
   }
+}
+// === COMPLETE ORDER NOTES, ALARMS & NOTIFICATIONS SYSTEM ===
+window.currentActiveAlarmNoteId = window.currentActiveAlarmNoteId || null;
+window.activeAudioBeep = window.activeAudioBeep || null;
+window.pendingAlarmOrderId = window.pendingAlarmOrderId || null;
+
+// ১. নোটিফিকেশন ড্রপডাউন টগল করা
+function toggleNotificationDropdown() {
+  const dropdown = document.getElementById("notificationDropdown");
+  if (dropdown) {
+    dropdown.classList.toggle("hidden");
+    if (!dropdown.classList.contains("hidden")) {
+      fetchNotifications();
+    }
+  }
+}
+// === FIXED NOTIFICATION RENDERER & ORDER OPENING LOGIC ===
+async function fetchNotifications() {
+  if (!_supabase || !loggedInUser) return;
+
+  const { data, error } = await _supabase
+    .from("notifications")
+    .select("*")
+    .eq("user_email", loggedInUser.email)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error) {
+    console.error("Error fetching notifications:", error);
+    return;
+  }
+
+  const badge = document.getElementById("notificationBadgeCount");
+  const listContainer = document.getElementById("notificationDropdownList");
+  if (!listContainer) return;
+
+  if (data && data.length > 0) {
+    const unreadCount = data.filter((n) => !n.is_read).length;
+    if (badge) {
+      if (unreadCount > 0) {
+        badge.innerText = unreadCount;
+        badge.classList.remove("hidden");
+      } else {
+        badge.classList.add("hidden");
+      }
+    }
+
+    listContainer.innerHTML = "";
+    data.forEach((item) => {
+      const timeStr = new Date(item.created_at).toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+
+      const row = document.createElement("div");
+      row.className = item.is_read
+        ? "flex items-start gap-3 p-3 hover:bg-slate-50 transition cursor-pointer border-b border-slate-100"
+        : "flex items-start gap-3 p-3 bg-blue-100/90 hover:bg-blue-200/80 transition cursor-pointer border-b border-slate-100 border-l-4 border-blue-600 relative";
+
+      row.innerHTML = `
+        <div class="relative flex-shrink-0 mt-0.5">
+          <div class="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm shadow-md">
+            <i class="fa-solid fa-bell"></i>
+          </div>
+          ${!item.is_read ? '<span class="absolute bottom-0 right-0 w-3 h-3 bg-blue-600 border-2 border-white rounded-full"></span>' : ""}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between mb-0.5">
+            <h5 class="text-xs font-bold text-slate-900 truncate"><i class="fa-solid fa-phone-alt text-[10px] mr-1 text-blue-600"></i>${item.title}</h5>
+            <span class="text-[10px] text-slate-400 font-medium ml-2 flex-shrink-0">${timeStr}</span>
+          </div>
+          <p class="text-xs text-slate-700 leading-relaxed">${item.message}</p>
+        </div>
+      `;
+
+      // 🟢 যেকোনো ট্যাবে থাকলেও প্রথমে কানাডা স্টক ট্যাবে যাবে তারপর অর্ডার ওপেন করবে
+      row.onclick = async () => {
+        // ১. নোটিফিকেশনটি রিড হিসেবে আপডেট করা
+        await _supabase
+          .from("notifications")
+          .update({ is_read: true })
+          .eq("id", item.id);
+
+        // ২. ড্রপডাউন বন্ধ করা
+        if (typeof toggleNotificationDropdown === "function") {
+          toggleNotificationDropdown();
+        }
+
+        if (item.order_id) {
+          const targetOrderId = String(item.order_id).trim();
+
+          // ৩. যদি ইউজারের প্রজেক্টে ট্যাব সুইচ করার ফাংশন বা বাটন থাকে, সেটি আগে কল করা
+          // (আপনার প্রজেক্টের ট্যাব সুইচি ফাংশনটির নাম যদি আলাদা হয় যেমন switchTab('canada') সেটি এখানে বসাতে পারেন)
+          const canadaStockTabBtn =
+            document.querySelector(
+              "[onclick*='canada'], [data-tab*='canada']",
+            ) || document.getElementById("canadaStockTabBtn");
+          if (canadaStockTabBtn) {
+            canadaStockTabBtn.click(); // অটোমেটিক কানাডা স্টক ট্যাবে নিয়ে যাবে
+          } else if (typeof switchTab === "function") {
+            switchTab("canada");
+          }
+
+          // ৪. সামান্য বিরতি দিয়ে অর্ডার ভিউ ফাংশন কল করা যাতে ট্যাব লোড হওয়ার সময় পায়
+          setTimeout(() => {
+            if (typeof viewCanadaOrder === "function") {
+              viewCanadaOrder(targetOrderId);
+            } else {
+              console.error("viewCanadaOrder function is not defined!");
+            }
+          }, 200);
+        }
+
+        fetchNotifications();
+      };
+
+      listContainer.appendChild(row);
+    });
+  } else {
+    if (badge) badge.classList.add("hidden");
+    listContainer.innerHTML = `
+      <div class="py-12 text-center">
+        <div class="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-2 text-lg">
+          <i class="fa-regular fa-bell-slash"></i>
+        </div>
+        <p class="text-xs text-slate-400 font-medium">No notifications yet</p>
+      </div>
+    `;
+  }
+}
+
+// ৩. সব নোটিফিকেশন একসাথে রিড করা
+async function markAllNotificationsAsRead() {
+  if (!_supabase || !loggedInUser) return;
+  await _supabase
+    .from("notifications")
+    .update({ is_read: true })
+    .eq("user_email", loggedInUser.email);
+  fetchNotifications();
+}
+
+// ৪. অর্ডার নোটস মডাল ওপেন/ক্লোজ
+function openOrderNotesModal() {
+  const modal = document.getElementById("orderNotesModal");
+  if (modal) modal.classList.remove("hidden");
+  fetchOrderReminders();
+}
+
+function closeOrderNotesModal() {
+  const modal = document.getElementById("orderNotesModal");
+  if (modal) modal.classList.add("hidden");
+}
+
+// === SAVE NOTE & REMINDER (Instant Notification Removed) ===
+async function saveOrderNoteAndAlarm() {
+  if (!_supabase || !loggedInUser) return;
+  const orderIdText =
+    document.getElementById("canadaActivationId")?.innerText || "";
+  const noteContent = document.getElementById("orderNoteInput")?.value || "";
+  const reminderTime =
+    document.getElementById("orderAlarmInput")?.value || null;
+
+  if (!orderIdText || orderIdText === "-") {
+    showToast("No active order selected!", true);
+    return;
+  }
+
+  if (!reminderTime) {
+    showToast("Please set a valid alarm reminder time!", true);
+    return;
+  }
+
+  const cleanOrderId = String(orderIdText).replace("#", "").trim();
+
+  // ১. শুধু order_notes টেবিলে রিমাইন্ডার সেভ হবে (সাথে সাথে কোনো নোটিফিকেশন তৈরি হবে না)
+  const { error: noteError } = await _supabase.from("order_notes").insert([
+    {
+      order_id: cleanOrderId,
+      user_email: loggedInUser.email,
+      note_content: noteContent,
+      reminder_time: new Date(reminderTime).toISOString(),
+      is_completed: false,
+      notification_triggered: false, // 🟢 নোটিফিকেশন এখনো ট্রিগার হয়নি
+    },
+  ]);
+
+  if (noteError) {
+    showToast("Error saving note: " + noteError.message, true);
+    return;
+  }
+
+  showToast("Alarm reminder set successfully!");
+  document.getElementById("orderNoteInput").value = "";
+  document.getElementById("orderAlarmInput").value = "";
+  closeOrderNotesModal();
+  fetchOrderReminders();
+}
+// === UPDATED BACKGROUND ALARM CHECKER (Saves Phone Number in Title) ===
+async function checkAndTriggerAlarms() {
+  if (!_supabase || !loggedInUser) return;
+  const nowIso = new Date().toISOString();
+
+  const { data: dueReminders } = await _supabase
+    .from("order_notes")
+    .select("*")
+    .eq("user_email", loggedInUser.email)
+    .eq("is_completed", false)
+    .eq("notification_triggered", false)
+    .not("reminder_time", "is", null)
+    .lte("reminder_time", nowIso);
+
+  if (dueReminders && dueReminders.length > 0) {
+    for (const reminder of dueReminders) {
+      const formattedTime = new Date(reminder.reminder_time).toLocaleTimeString(
+        [],
+        {
+          hour: "numeric",
+          minute: "2-digit",
+        },
+      );
+
+      // 🟢 অর্ডার টেবিল থেকে এই অর্ডারের ফোন নম্বরটি বের করে আনা
+      let orderPhoneNum = `Order #${reminder.order_id}`;
+      try {
+        const { data: orderData } = await _supabase
+          .from("canada_orders")
+          .select("phone_number")
+          .eq("id", reminder.order_id)
+          .single();
+
+        if (orderData && orderData.phone_number) {
+          orderPhoneNum = orderData.phone_number;
+        }
+      } catch (e) {
+        console.log("Could not fetch phone number", e);
+      }
+
+      // নোটিফিকেশন টেবিলে টাইটেলে ফোন নম্বর এবং মেসেজে নোট ও টাইম সেভ করা
+      await _supabase.from("notifications").insert([
+        {
+          user_email: loggedInUser.email,
+          title: orderPhoneNum, // 🟢 এখানে অর্ডারের ফোন নম্বর শো করবে
+          message: `${reminder.note_content || "Reminder alert reached."}\nTime reached: ${formattedTime}`, // 🟢 মেসেজ ও টাইম নিচে থাকবে
+          order_id: reminder.order_id,
+          is_read: false,
+        },
+      ]);
+
+      await _supabase
+        .from("order_notes")
+        .update({ notification_triggered: true })
+        .eq("id", reminder.id);
+    }
+
+    if (typeof fetchNotifications === "function") {
+      fetchNotifications();
+    }
+  }
+}
+
+// প্রতি ১০ সেকেন্ড পর পর ব্যাকগ্রাউন্ডে চেক করবে
+if (!window._alarmIntervalStarted) {
+  window._alarmIntervalStarted = true;
+  setInterval(checkAndTriggerAlarms, 10000);
+}
+
+// পেজ লোড হওয়ার সাথে সাথে এবং প্রতি ১০ সেকেন্ড পর পর চেক করবে
+window.addEventListener("DOMContentLoaded", () => {
+  setTimeout(checkAndTriggerAlarms, 1000);
+});
+
+if (!window._alarmIntervalStarted) {
+  window._alarmIntervalStarted = true;
+  setInterval(checkAndTriggerAlarms, 10000);
+}
+
+// নির্দিষ্ট অর্ডারের সব রিমাইন্ডার ও নোটস ফেচ করে ইউআই তে দেখানোর ফাংশন
+async function fetchOrderReminders() {
+  const orderIdText =
+    document.getElementById("canadaActivationId")?.innerText || "";
+  const cleanId = String(orderIdText).replace("#", "").trim();
+  const container = document.getElementById("orderReminderListContainer");
+  if (!container || !cleanId || cleanId === "-") return;
+
+  const { data } = await _supabase
+    .from("order_notes")
+    .select("*")
+    .eq("order_id", cleanId)
+    .eq("user_email", loggedInUser.email)
+    .order("created_at", { ascending: false });
+
+  if (data && data.length > 0) {
+    container.innerHTML = "";
+    data.forEach((item) => {
+      const timeFormatted = item.reminder_time
+        ? new Date(item.reminder_time).toLocaleString()
+        : "No alarm set";
+      const statusBadge = item.is_completed
+        ? `<span class="bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-md text-[10px] font-bold">Completed</span>`
+        : `<span class="bg-amber-100 text-amber-700 px-2.5 py-1 rounded-md text-[10px] font-bold">Active Alarm</span>`;
+
+      const div = document.createElement("div");
+      div.className =
+        "bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 text-xs flex items-center justify-between gap-3 shadow-sm";
+      div.innerHTML = `
+        <div class="space-y-1">
+          <p class="font-bold text-slate-800">${item.note_content || "No note text"}</p>
+          <span class="text-[11px] text-slate-500 font-mono flex items-center gap-1"><i class="fa-regular fa-clock text-slate-400"></i>${timeFormatted}</span>
+        </div>
+        <div class="flex items-center gap-2">
+          ${statusBadge}
+          ${!item.is_completed ? `<button onclick="markReminderCompleted(${item.id})" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-bold text-[10px] cursor-pointer shadow">Done</button>` : ""}
+        </div>
+      `;
+      container.appendChild(div);
+    });
+  } else {
+    container.innerHTML = `<span class="text-xs text-slate-400 italic">No notes or reminders found for this order.</span>`;
+  }
+}
+
+// ৮. রিমাইন্ডার কমপ্লিট করা
+async function markReminderCompleted(noteId) {
+  await _supabase
+    .from("order_notes")
+    .update({ is_completed: true })
+    .eq("id", noteId);
+  showToast("Reminder marked as completed!");
+  fetchOrderReminders();
 }

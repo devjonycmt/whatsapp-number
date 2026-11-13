@@ -90,6 +90,7 @@
             <h2 class="text-2xl font-extrabold tracking-tight text-slate-900">
               TEAM NEXA
             </h2>
+
             <p class="text-xs text-slate-500 font-medium mt-1">
               Secure Multi-User Verification Portal
             </p>
@@ -945,6 +946,15 @@
                     </div>
                   </div>
                 </div>
+
+                <!-- 📝 NOTES & REMINDER TRIGGER BUTTON -->
+                <button
+                  onclick="openOrderNotesModal()"
+                  class="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/80 text-xs font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <i class="fa-solid fa-note-sticky text-amber-500"></i> Notes &
+                  Alarm
+                </button>
                 <button
                   onclick="resetCanadaBuyView()"
                   class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2 cursor-pointer"
@@ -1041,6 +1051,26 @@
                   <i class="fa-solid fa-circle-check text-base"></i> Success
                   Completed
                 </button>
+              </div>
+
+              <!-- 📋 Order Notes & Alarm History Container -->
+              <div
+                class="mt-6 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5"
+              >
+                <div class="flex items-center justify-between mb-3">
+                  <h4
+                    class="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2"
+                  >
+                    <i class="fa-solid fa-clock-rotate-left text-blue-600"></i>
+                    Notes & Alarm History for this Order
+                  </h4>
+                </div>
+                <!-- যেখানে হিস্ট্রি লিস্ট ডাইনামিকালি রেন্ডার হবে -->
+                <div id="orderReminderListContainer" class="space-y-2">
+                  <span class="text-xs text-slate-400 italic"
+                    >No notes or reminders found for this order.</span
+                  >
+                </div>
               </div>
             </div>
 
@@ -1731,6 +1761,177 @@
       </div>
     </div>
 
+    <!-- 🔔 FIXED FLOATING NOTIFICATION BUTTON (Bottom-Right) -->
+    <div class="fixed bottom-6 right-6 z-50">
+      <div class="relative">
+        <button
+          onclick="toggleNotificationDropdown()"
+          class="relative w-14 h-14 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center transition shadow-2xl border-2 border-slate-700/80 cursor-pointer hover:scale-105 active:scale-95"
+          title="Notifications"
+        >
+          <i class="fa-solid fa-bell text-xl"></i>
+          <span
+            id="notificationBadgeCount"
+            class="hidden absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[11px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-lg animate-pulse"
+            >0</span
+          >
+        </button>
+
+        <!-- Notification Dropdown Menu (ऊपर की तरफ खुलेगा / Opens Upwards) -->
+        <div
+          id="notificationDropdown"
+          class="hidden absolute bottom-16 right-0 w-80 max-h-96 bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden z-50 flex flex-col animate-fadeIn"
+        >
+          <div
+            class="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between"
+          >
+            <h4
+              class="text-xs font-black uppercase tracking-wider text-slate-700"
+            >
+              Notifications
+            </h4>
+            <button
+              onclick="markAllNotificationsAsRead()"
+              class="text-[11px] text-blue-600 hover:underline cursor-pointer font-bold"
+            >
+              Mark all read
+            </button>
+          </div>
+          <div
+            id="notificationDropdownList"
+            class="overflow-y-auto divide-y divide-slate-100 flex-1"
+          >
+            <div class="p-4 text-center text-xs text-slate-400">
+              No new notifications
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 📝 ORDER NOTES & ALARM MODAL -->
+    <div
+      id="orderNotesModal"
+      class="hidden fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-white rounded-3xl w-full max-w-lg border border-slate-200 shadow-2xl overflow-hidden flex flex-col"
+      >
+        <div
+          class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50"
+        >
+          <h3
+            class="text-base font-black text-slate-900 flex items-center gap-2"
+          >
+            <i class="fa-solid fa-clock-rotate-left text-blue-600"></i> Order
+            Notes & Alarm Reminder
+          </h3>
+          <button
+            onclick="closeOrderNotesModal()"
+            class="w-8 h-8 rounded-xl bg-slate-200/70 hover:bg-rose-50 text-slate-600 hover:text-rose-600 flex items-center justify-center transition cursor-pointer"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div>
+            <label
+              class="block text-xs font-bold text-slate-600 uppercase mb-1.5"
+              >Problem / Note Content</label
+            >
+            <textarea
+              id="orderNoteInput"
+              rows="3"
+              placeholder="Write down any issue or note regarding this number..."
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-blue-600 text-slate-800"
+            ></textarea>
+          </div>
+          <div>
+            <label
+              class="block text-xs font-bold text-slate-600 uppercase mb-1.5"
+              >Set Alarm Reminder Time</label
+            >
+            <input
+              type="datetime-local"
+              id="orderAlarmInput"
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-blue-600 text-slate-800 font-mono"
+            />
+          </div>
+          <button
+            onclick="saveOrderNoteAndAlarm()"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl text-sm transition shadow-lg shadow-blue-600/20 cursor-pointer flex items-center justify-center gap-2"
+          >
+            <i class="fa-solid fa-floppy-disk"></i> Save Note & Reminder
+          </button>
+
+          <!-- All Reminders for this Order -->
+          <div class="border-t border-slate-100 pt-4 mt-4">
+            <h4 class="text-xs font-black text-slate-500 uppercase mb-3">
+              Saved Reminders for this Order
+            </h4>
+            <div
+              id="orderReminderListContainer"
+              class="space-y-2 max-h-44 overflow-y-auto"
+            >
+              <span class="text-xs text-slate-400 italic"
+                >No reminders set.</span
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⏰ ALARM POPUP ALERT MODAL -->
+    <div
+      id="alarmPopupModal"
+      class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
+    >
+      <div
+        class="bg-white rounded-3xl w-full max-w-md border border-amber-300 shadow-2xl p-6 text-center space-y-4 relative overflow-hidden"
+      >
+        <div
+          class="absolute -top-12 -right-12 w-32 h-32 bg-amber-500/20 rounded-full blur-2xl"
+        ></div>
+        <div
+          class="w-16 h-16 bg-amber-100 text-amber-600 rounded-3xl flex items-center justify-center text-2xl mx-auto shadow-inner animate-bounce"
+        >
+          <i class="fa-solid fa-bell"></i>
+        </div>
+        <div>
+          <span
+            class="text-[10px] font-black uppercase tracking-widest bg-amber-100 text-amber-700 px-3 py-1 rounded-full"
+            >ALARM REMINDER TRIGGERED</span
+          >
+          <h3
+            id="alarmPopupTitle"
+            class="text-xl font-black text-slate-900 mt-2"
+          >
+            Order #CAD-00000
+          </h3>
+          <p
+            id="alarmPopupNote"
+            class="text-sm text-slate-600 mt-2 bg-slate-50 p-3 rounded-xl border border-slate-100 italic"
+          ></p>
+        </div>
+        <div class="flex items-center gap-3 pt-2">
+          <!-- 🟢 Open Note Button (Sound বন্ধ হবে এবং অর্ডারে নিয়ে যাবে, কিন্তু কমপ্লিট হবে না) -->
+          <button
+            onclick="openReminderNoteFromPopup()"
+            class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl text-xs transition cursor-pointer shadow-lg shadow-blue-600/20 flex items-center justify-center gap-1.5"
+          >
+            <i class="fa-solid fa-eye"></i> Open Note
+          </button>
+          <!-- 🟢 Completed Button (ক্লিক করলেই কেবল কমপ্লিট হবে) -->
+          <button
+            onclick="completeReminderFromPopup()"
+            class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl text-xs transition cursor-pointer shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-1.5"
+          >
+            <i class="fa-solid fa-check"></i> Completed
+          </button>
+        </div>
+      </div>
+    </div>
     <script>
       // Helper script for mobile sidebar toggle drawer
       function toggleMobileSidebar() {
