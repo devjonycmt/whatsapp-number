@@ -80,7 +80,7 @@ async function checkBalance() {
     } else if (typeof data === "number" || typeof data === "string") {
       balanceVal = parseFloat(data).toFixed(2);
     }
-    if (sidebarBalance) sidebarBalance.innerText = `৳${balanceVal}`;
+    if (sidebarBalance) sidebarBalance.innerText = `$${balanceVal}`;
   } catch (error) {
     console.error("Balance fetch error:", error);
   } finally {
