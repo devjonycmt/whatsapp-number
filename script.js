@@ -1605,7 +1605,7 @@ async function buyCanadaNumber() {
     }
   }
 }
-// === MARK CANADA ORDER AS SUCCESS (Only Success, No Refund & Logs Activity) ===
+// === MARK CANADA ORDER AS SUCCESS (Saves Success Timestamp) ===
 async function completeCanadaActiveOrder(specificId) {
   const orderId =
     specificId || document.getElementById("canadaActivationId").innerText;
@@ -1622,6 +1622,7 @@ async function completeCanadaActiveOrder(specificId) {
 
   try {
     const cleanId = String(orderId).replace("#", "").trim();
+    const successTimeIso = new Date().toISOString(); // 🟢 বর্তমান সাকসেস টাইম
 
     // অর্ডার থেকে ফোন নাম্বারটি বের করে নেওয়া
     const { data: orderData } = await _supabase
@@ -1632,13 +1633,16 @@ async function completeCanadaActiveOrder(specificId) {
 
     const phoneNum = orderData ? orderData.phone_number : "";
 
-    // ১. স্ট্যাটাস Success আপডেট করা
+    // ১. স্ট্যাটাস Success এবং success_at টাইম আপডেট করা
     await _supabase
       .from("canada_orders")
-      .update({ status: "Success" })
+      .update({
+        status: "Success",
+        success_at: successTimeIso,
+      })
       .eq("order_id", cleanId);
 
-    // ২. 🟢 শুধুমাত্র Success হলে অ্যাক্টিভিটি ফিডে দেখানোর জন্য সিস্টেম লগ রেকর্ড করা
+    // ২. অ্যাক্টিভিটি ফিডে লগ রেকর্ড করা
     await recordSystemLog(
       loggedInUser.email,
       "CANADA_SUCCESS",
@@ -1821,7 +1825,7 @@ async function cancelCanadaActiveOrder(specificId) {
   }
 }
 
-// === FETCH CANADA HISTORY ===
+// === FETCH CANADA HISTORY (Clean & Premium Modern UI) ===
 async function fetchCanadaHistory() {
   if (!_supabase || !loggedInUser) return;
 
@@ -1834,59 +1838,96 @@ async function fetchCanadaHistory() {
 
     if (error) throw error;
 
+    const tableContainer = document.querySelector(
+      "#canadaHistorySection table",
+    );
+    if (!tableContainer) return;
+
+    // ১. টেবিলের হেডার আরও সুন্দর ও প্রিমিয়াম করা হলো
+    const thead = tableContainer.querySelector("thead tr");
+    if (thead) {
+      thead.className =
+        "bg-slate-50/80 border-b border-slate-100 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider";
+      thead.innerHTML = `
+        <th class="py-3.5 px-4 text-left">ID</th>
+        <th class="py-3.5 px-4 text-left">Number</th>
+        <th class="py-3.5 px-4 text-left">Link</th>
+        <th class="py-3.5 px-4 text-left">Order Time</th>
+        <th class="py-3.5 px-4 text-left">Success Time</th>
+        <th class="py-3.5 px-4 text-left">Status</th>
+        <th class="py-3.5 px-4 text-center">Action</th>
+      `;
+    }
+
     const tbody = document.getElementById("canadaHistoryTableBody");
     if (!tbody) return;
 
     tbody.innerHTML = "";
 
     if (!data || data.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400 font-normal">No Canada history found.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-400 font-medium text-sm">No Canada order history found.</td></tr>`;
       return;
     }
 
     data.forEach((order) => {
+      // অর্ডার করার সময় ফরম্যাট
+      const orderTimeFormatted = order.created_at
+        ? new Date(order.created_at).toLocaleString([], {
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "-";
+
+      // সাকসেস হওয়ার সময় ফরম্যাট (যদি সাকসেস না হয় তবে হালকা রঙে Pending দেখাবে)
+      const successTimeFormatted = order.success_at
+        ? `<span class="text-emerald-600 font-bold">${new Date(order.success_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>`
+        : `<span class="text-slate-400 font-normal italic text-xs bg-slate-100 px-2 py-0.5 rounded">Pending</span>`;
+
       let statusBadge = "";
       const statusLower = (order.status || "").toLowerCase();
 
       if (statusLower.includes("cancel")) {
-        statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-100 whitespace-nowrap">
-                        <i class="fa-solid fa-circle-xmark mr-1"></i> Canceled & Refunded
+        statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-100 whitespace-nowrap shadow-sm">
+                        <i class="fa-solid fa-circle-xmark mr-1.5 text-[10px]"></i> Canceled
                       </span>`;
       } else if (statusLower.includes("success")) {
-        statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100 whitespace-nowrap">
-                        <i class="fa-solid fa-circle-check mr-1"></i> Success (Completed)
+        statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100 whitespace-nowrap shadow-sm">
+                        <i class="fa-solid fa-circle-check mr-1.5 text-[10px]"></i> Success
                       </span>`;
       } else {
-        // 🟢 নতুন অর্ডারের ক্ষেত্রে হিস্ট্রিতে "Order Confirm" দেখাবে
-        statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap">
-                        <i class="fa-solid fa-circle-check mr-1"></i> Order Confirm
+        statusBadge = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap shadow-sm">
+                        <i class="fa-solid fa-clock mr-1.5 text-[10px]"></i> Order Confirm
                       </span>`;
       }
 
-      const row = `
-        <tr class="border-b border-slate-50 hover:bg-slate-50/80 transition-colors">
-          <td class="py-3.5 px-4 text-blue-600 font-bold">#${order.order_id}</td>
-          <td class="py-3.5 px-4 text-slate-700 font-semibold">${order.phone_number || "-"}</td>
-          <td class="py-3.5 px-4 max-w-[200px] truncate">
-            <a href="${order.otp}" target="_blank" class="text-blue-500 hover:text-blue-700 hover:underline text-xs bg-blue-50 px-2 py-1 rounded border border-blue-100 inline-block truncate max-w-full">
-              ${order.otp || "-"}
-            </a>
-          </td>
-          <td class="py-3.5 px-4">${statusBadge}</td>
-          <td class="py-3.5 px-4 text-center">
-            <button onclick="viewCanadaOrder('${order.order_id}')" class="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm inline-flex items-center gap-1">
-              <i class="fa-solid fa-eye"></i> View
-            </button>
-          </td>
-        </tr>
+      const row = document.createElement("tr");
+      row.className =
+        "border-b border-slate-50 hover:bg-slate-50/60 transition-all text-sm";
+      row.innerHTML = `
+        <td class="py-4 px-4 text-blue-600 font-extrabold font-mono text-xs">#${order.order_id}</td>
+        <td class="py-4 px-4 text-slate-700 font-bold font-mono text-xs">${order.phone_number || "-"}</td>
+        <td class="py-4 px-4 max-w-[160px] truncate">
+          <a href="${order.otp}" target="_blank" class="text-blue-500 hover:text-blue-700 hover:underline text-xs bg-blue-50/80 px-2.5 py-1 rounded-lg border border-blue-100 inline-block truncate max-w-full font-medium shadow-2xs">
+            <i class="fa-solid fa-link mr-1 text-[10px]"></i> ${order.otp || "-"}
+          </a>
+        </td>
+        <td class="py-4 px-4 text-xs font-mono text-slate-500 font-medium whitespace-nowrap">${orderTimeFormatted}</td>
+        <td class="py-4 px-4 text-xs font-mono whitespace-nowrap">${successTimeFormatted}</td>
+        <td class="py-4 px-4">${statusBadge}</td>
+        <td class="py-4 px-4 text-center">
+          <button onclick="viewCanadaOrder('${order.order_id}')" class="bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-eye"></i> View
+          </button>
+        </td>
       `;
-      tbody.innerHTML += row;
+      tbody.appendChild(row);
     });
   } catch (e) {
     console.error("Error fetching Canada history:", e);
   }
 }
-
 // === 3. RESET CANADA BUY VIEW (Restores history section when clicking New Order) ===
 function resetCanadaBuyView() {
   document.getElementById("canadaOrderCard").classList.add("hidden");
@@ -2116,4 +2157,258 @@ function maskPhoneNumber(phone) {
   const start = cleanPhone.slice(0, 4);
   const end = cleanPhone.slice(-4);
   return `${start}***${end}`;
+}
+
+// === USER DATE-WISE HISTORY & RE-WORK SYSTEM ===
+let cachedUserAllOrders = [];
+let currentSelectedDateOrders = [];
+
+// মডাল ওপেন করা এবং লগইন ইউজারের সব ডাটা লোড করা
+async function openMyDateHistoryModal() {
+  if (!_supabase || !loggedInUser) return;
+
+  const modal = document.getElementById("myDateHistoryModal");
+  const body = document.getElementById("myDateHistoryBody");
+  if (modal) modal.classList.remove("hidden");
+  if (body)
+    body.innerHTML = `<div class="text-center py-10 text-slate-400 text-sm"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading your work dates...</div>`;
+
+  const { data, error } = await _supabase
+    .from("canada_orders")
+    .select("*")
+    .eq("user_email", loggedInUser.email)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    if (body)
+      body.innerHTML = `<div class="text-center py-8 text-rose-500 text-sm">Failed to load history.</div>`;
+    return;
+  }
+
+  cachedUserAllOrders = data || [];
+  renderUserDateSummaryView();
+}
+
+function closeMyDateHistoryModal() {
+  const modal = document.getElementById("myDateHistoryModal");
+  if (modal) modal.classList.add("hidden");
+}
+
+// ধাপ ১: তারিখ অনুযায়ী সামারি লিস্ট দেখানো
+function renderUserDateSummaryView() {
+  const body = document.getElementById("myDateHistoryBody");
+  const backBtn = document.getElementById("btnBackToDateList");
+  const filterBar = document.getElementById("dateDetailFilterBar");
+  const titleEl = document.getElementById("dateModalTitle");
+  const subTitleEl = document.getElementById("dateModalSubTitle");
+
+  if (backBtn) backBtn.classList.add("hidden");
+  if (filterBar) filterBar.classList.add("hidden");
+  if (titleEl) titleEl.innerText = "My Work History (Date-Wise)";
+  if (subTitleEl)
+    subTitleEl.innerText =
+      "Select a date to view report or re-work on Not Work numbers.";
+
+  if (!cachedUserAllOrders || cachedUserAllOrders.length === 0) {
+    body.innerHTML = `<div class="text-center py-10 text-slate-400 text-sm">No work history found for your account yet.</div>`;
+    return;
+  }
+
+  // Asia/Dhaka টাইমজোন অনুযায়ী তারিখ গ্রুপ করা
+  const groupedByDate = {};
+  cachedUserAllOrders.forEach((order) => {
+    const dhakaDateStr = new Date(order.created_at).toLocaleDateString(
+      "en-CA",
+      {
+        timeZone: "Asia/Dhaka",
+      },
+    ); // YYYY-MM-DD ফরম্যাট
+
+    if (!groupedByDate[dhakaDateStr]) {
+      groupedByDate[dhakaDateStr] = [];
+    }
+    groupedByDate[dhakaDateStr].push(order);
+  });
+
+  const sortedDates = Object.keys(groupedByDate).sort().reverse();
+  body.innerHTML = "";
+
+  sortedDates.forEach((dateKey) => {
+    const orders = groupedByDate[dateKey];
+    const totalOrder = orders.length;
+    const successCount = orders.filter(
+      (o) => o.status && o.status.toLowerCase().includes("success"),
+    ).length;
+    const notWorkCount = totalOrder - successCount;
+    const spent = successCount * 0.12;
+
+    const readableDate = new Date(dateKey + "T00:00:00").toLocaleDateString(
+      "en-US",
+      {
+        weekday: "short",
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      },
+    );
+
+    const card = document.createElement("div");
+    card.className =
+      "flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50 hover:bg-slate-100/80 p-4 rounded-2xl border border-slate-200/70 transition";
+
+    card.innerHTML = `
+      <div class="flex items-center gap-3.5">
+        <div class="w-11 h-11 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-base shrink-0">
+          <i class="fa-regular fa-calendar-check"></i>
+        </div>
+        <div>
+          <h4 class="text-sm font-black text-slate-900">${readableDate} <span class="text-xs font-mono text-slate-400 font-normal">(${dateKey})</span></h4>
+          <div class="flex items-center gap-3 text-xs font-semibold mt-1 flex-wrap">
+            <span class="text-blue-600">Total: <b>${totalOrder}</b></span>
+            <span class="text-slate-300">|</span>
+            <span class="text-emerald-600">Success: <b>${successCount}</b></span>
+            <span class="text-slate-300">|</span>
+            <span class="text-rose-600">Not Work: <b>${notWorkCount}</b></span>
+            <span class="text-slate-300">|</span>
+            <span class="text-amber-600">Spent: <b>$${spent.toFixed(2)}</b></span>
+          </div>
+        </div>
+      </div>
+
+      <button
+        onclick="openSpecificDateOrders('${dateKey}')"
+        class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm self-start sm:self-auto"
+      >
+        <i class="fa-solid fa-eye"></i> View History
+      </button>
+    `;
+    body.appendChild(card);
+  });
+}
+
+// ধাপ ২: নির্দিষ্ট তারিখের ভেতরে ঢুকে সব নাম্বার দেখা
+function openSpecificDateOrders(dateKey) {
+  const backBtn = document.getElementById("btnBackToDateList");
+  const filterBar = document.getElementById("dateDetailFilterBar");
+  const titleEl = document.getElementById("dateModalTitle");
+  const subTitleEl = document.getElementById("dateModalSubTitle");
+
+  if (backBtn) backBtn.classList.remove("hidden");
+  if (filterBar) filterBar.classList.remove("hidden");
+  if (titleEl) titleEl.innerText = `Work Details: ${dateKey}`;
+  if (subTitleEl)
+    subTitleEl.innerText =
+      "Click 'Work Now' on any Not Work number to open & complete it.";
+
+  currentSelectedDateOrders = cachedUserAllOrders.filter((order) => {
+    const dhakaDateStr = new Date(order.created_at).toLocaleDateString(
+      "en-CA",
+      {
+        timeZone: "Asia/Dhaka",
+      },
+    );
+    return dhakaDateStr === dateKey;
+  });
+
+  const total = currentSelectedDateOrders.length;
+  const success = currentSelectedDateOrders.filter((o) =>
+    (o.status || "").toLowerCase().includes("success"),
+  ).length;
+  const notWork = total - success;
+
+  const badgeEl = document.getElementById("dateDetailSummaryBadge");
+  if (badgeEl) {
+    badgeEl.innerHTML = `Total: <span class="text-blue-600">${total}</span> • Success: <span class="text-emerald-600">${success}</span> • Not Work: <span class="text-rose-600">${notWork}</span>`;
+  }
+
+  filterDateDetailOrders("all");
+}
+
+// ধাপ ৩: নির্দিষ্ট তারিখের অর্ডারগুলো ফিল্টার ও রেন্ডার করা
+function filterDateDetailOrders(filterType) {
+  const body = document.getElementById("myDateHistoryBody");
+  if (!body) return;
+
+  // বাটন অ্যাক্টিভ স্টাইল আপডেট
+  const tabAll = document.getElementById("tabDateAll");
+  const tabNotWork = document.getElementById("tabDateNotWork");
+  const tabSuccess = document.getElementById("tabDateSuccess");
+
+  if (tabAll)
+    tabAll.className =
+      filterType === "all"
+        ? "px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white cursor-pointer"
+        : "px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200/70 text-slate-700 cursor-pointer";
+  if (tabNotWork)
+    tabNotWork.className =
+      filterType === "not_work"
+        ? "px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white cursor-pointer"
+        : "px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-600 cursor-pointer";
+  if (tabSuccess)
+    tabSuccess.className =
+      filterType === "success"
+        ? "px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white cursor-pointer"
+        : "px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-600 cursor-pointer";
+
+  let filtered = currentSelectedDateOrders;
+  if (filterType === "success") {
+    filtered = currentSelectedDateOrders.filter((o) =>
+      (o.status || "").toLowerCase().includes("success"),
+    );
+  } else if (filterType === "not_work") {
+    filtered = currentSelectedDateOrders.filter(
+      (o) => !(o.status || "").toLowerCase().includes("success"),
+    );
+  }
+
+  if (filtered.length === 0) {
+    body.innerHTML = `<div class="text-center py-8 text-slate-400 text-sm">No orders found in this category.</div>`;
+    return;
+  }
+
+  body.innerHTML = "";
+  filtered.forEach((order) => {
+    const isSuccess = (order.status || "").toLowerCase().includes("success");
+    const orderTime = new Date(order.created_at).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Asia/Dhaka",
+    });
+
+    const statusBadge = isSuccess
+      ? `<span class="bg-emerald-50 text-emerald-600 border border-emerald-200 px-2.5 py-0.5 rounded-full text-[11px] font-bold"><i class="fa-solid fa-check mr-1"></i>Success</span>`
+      : `<span class="bg-rose-50 text-rose-600 border border-rose-200 px-2.5 py-0.5 rounded-full text-[11px] font-bold"><i class="fa-solid fa-clock mr-1"></i>Not Work</span>`;
+
+    // Not Work হলে "Work Now" বাটন দেখাবে যাতে ইউজার ওপেন করে কাজ করতে পারে
+    const actionBtn = isSuccess
+      ? `<button onclick="reworkCanadaOrderFromHistory('${order.order_id}')" class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer">View</button>`
+      : `<button onclick="reworkCanadaOrderFromHistory('${order.order_id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-xl transition cursor-pointer shadow-sm flex items-center gap-1"><i class="fa-solid fa-play text-[10px]"></i> Work Now</button>`;
+
+    const row = document.createElement("div");
+    row.className =
+      "flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/80 hover:border-blue-200 transition";
+    row.innerHTML = `
+      <div class="flex items-center gap-3 flex-wrap">
+        <span class="text-xs font-mono font-extrabold text-blue-600">#${order.order_id}</span>
+        <span class="text-sm font-mono font-bold text-slate-800">${order.phone_number || "-"}</span>
+        ${statusBadge}
+        <span class="text-[11px] text-slate-400 font-mono">${orderTime}</span>
+      </div>
+      <div class="flex items-center gap-2 self-end sm:self-auto">
+        <a href="${order.otp}" target="_blank" class="bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1.5 rounded-xl transition">
+          <i class="fa-solid fa-link mr-1"></i> Link
+        </a>
+        ${actionBtn}
+      </div>
+    `;
+    body.appendChild(row);
+  });
+}
+
+// ধাপ ৪: Not Work নাম্বারে ক্লিক করলে মডাল বন্ধ হয়ে ওই অর্ডার কার্ড ওপেন হবে
+function reworkCanadaOrderFromHistory(orderId) {
+  closeMyDateHistoryModal();
+  if (typeof viewCanadaOrder === "function") {
+    viewCanadaOrder(orderId);
+  }
 }
