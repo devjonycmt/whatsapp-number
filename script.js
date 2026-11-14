@@ -2884,7 +2884,9 @@ async function loadActivityCountrySetting() {
     const inputEl = document.getElementById("settingActiveCountry");
     if (inputEl) inputEl.value = data.active_country;
 
-    // দেশের নাম লোড হওয়ার পরপরই ফিড রিফ্রেশ করা
+    // 🟢 সাইডবারের নাম আপডেট করা
+    updateSidebarCountryLabel(data.active_country);
+
     if (typeof fetchGlobalActivityLog === "function") {
       fetchGlobalActivityLog();
     }
@@ -2909,7 +2911,9 @@ async function saveActivityCountrySetting() {
   } else {
     window.activeStockCountry = countryVal;
 
-    // সেভ হওয়ার সাথে সাথে ড্যাশবোর্ডের ফিড আপডেট করা
+    // 🟢 সেভ হওয়ার সাথে সাথে সাইডবারের নাম ও ফিড আপডেট করা
+    updateSidebarCountryLabel(countryVal);
+
     if (typeof fetchGlobalActivityLog === "function") {
       fetchGlobalActivityLog();
     }
@@ -2921,6 +2925,35 @@ async function saveActivityCountrySetting() {
     }
   }
 }
+
+// ৩. রিয়েল-টাইম লিসেনার (অন্য সব ইউজারের সাইডবারেও সাথে সাথে নাম বদলাবে)
+window.addEventListener("DOMContentLoaded", () => {
+  loadActivityCountrySetting();
+
+  if (_supabase) {
+    _supabase
+      .channel("realtime-platform-country")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "platform_settings" },
+        (payload) => {
+          if (payload.new && payload.new.active_country) {
+            window.activeStockCountry = payload.new.active_country;
+            const inputEl = document.getElementById("settingActiveCountry");
+            if (inputEl) inputEl.value = payload.new.active_country;
+
+            // 🟢 রিয়েল-টাইমে সাইডবারের নাম আপডেট
+            updateSidebarCountryLabel(payload.new.active_country);
+
+            if (typeof fetchGlobalActivityLog === "function") {
+              fetchGlobalActivityLog();
+            }
+          }
+        },
+      )
+      .subscribe();
+  }
+});
 
 // ৪. অন্য ইউজারদের স্ক্রিনেও যেন রিয়েল-টাইমে দেশের নাম পরিবর্তন হয় তার লিসেনার
 window.addEventListener("DOMContentLoaded", () => {
@@ -2947,7 +2980,7 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// ১. ফরম্যাট মেসেজ ফাংশন (লগে সেভ থাকা নিজস্ব কান্ট্রি ব্যবহার করবে)
+// === UPDATED FORMATTER (Includes Email in Both Order & Success Messages) ===
 function formatActivityMessage(log) {
   const email = log.user_email || log.email || "admin@nexa.com";
   const rawType = (
@@ -2967,7 +3000,6 @@ function formatActivityMessage(log) {
     ? `#${String(log.order_id).replace("#", "")}`
     : "";
 
-  // 🟢 লগে সেভ থাকা দেশের নাম ব্যবহার করবে, না থাকলে বর্তমান গ্লোবাল নাম
   const logCountry = log.country || window.activeStockCountry || "Canada";
   const countryUpper = logCountry.toUpperCase();
   const isSuccess =
@@ -2976,7 +3008,7 @@ function formatActivityMessage(log) {
   if (isSuccess) {
     return {
       type: `${countryUpper} SUCCESS`,
-      text: `${logCountry} order ${orderId} has been successfully completed. Number: ${maskedPhone}`,
+      text: `${email} successfully completed ${logCountry} order ${orderId} | Number: ${maskedPhone}`,
     };
   } else {
     return {
@@ -2989,3 +3021,36 @@ function formatActivityMessage(log) {
 window.addEventListener("DOMContentLoaded", () => {
   setTimeout(loadActivityCountrySetting, 1000);
 });
+
+// === SIDEBAR STOCK MENU LABEL UPDATER ===
+function updateSidebarCountryLabel(country) {
+  const activeCountry = country || window.activeStockCountry || "Canada";
+  const navBtn = document.getElementById("navCanada");
+  if (!navBtn) return;
+
+  // বাটনের ভেতরের স্প্যান বা টেক্সট নোড খুঁজে 'Canada Stock' বা 'USA Stock' পরিবর্তন করা
+  const spans = navBtn.querySelectorAll("span");
+  let updated = false;
+
+  spans.forEach((span) => {
+    if (
+      span.id !== "canadaStockBadge" &&
+      span.innerText.toLowerCase().includes("stock")
+    ) {
+      span.innerText = `${activeCountry} Stock`;
+      updated = true;
+    }
+  });
+
+  // যদি স্প্যানের বদলে সরাসরি টেক্সট নোড থাকে তবে সেটি আপডেট করা
+  if (!updated) {
+    navBtn.childNodes.forEach((node) => {
+      if (
+        node.nodeType === Node.TEXT_NODE &&
+        node.textContent.trim().length > 0
+      ) {
+        node.textContent = ` ${activeCountry} Stock `;
+      }
+    });
+  }
+}
