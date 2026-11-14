@@ -618,9 +618,11 @@ async function recordSystemLog(
   orderId,
   phoneNumber,
   otpCode = null,
+  countryName = null, // 🟢 ৬ নম্বর প্যারামিটার যুক্ত করা হলো
 ) {
   if (!_supabase) return;
   try {
+    const finalCountry = countryName || window.activeStockCountry || "Canada";
     await _supabase.from("system_logs").insert([
       {
         user_email: userEmail,
@@ -628,13 +630,13 @@ async function recordSystemLog(
         order_id: orderId,
         phone_number: phoneNumber,
         otp_code: otpCode,
+        country: finalCountry, // 🟢 ডাটাবেজের system_logs টেবিলে দেশ সেভ হবে
       },
     ]);
   } catch (e) {
     console.error("Error logging system activity:", e);
   }
 }
-
 // === 2. BUY NUMBER & MINUS 1 FROM DATABASE LIMIT ===
 async function buyNumber() {
   if (!loggedInUser) return;
@@ -1019,7 +1021,7 @@ async function checkForNewActivity() {
   }
 }
 
-// === FETCH GLOBAL ACTIVITY LOG (Shows all activities with masked phone numbers) ===
+// ২. ড্যাশবোর্ড ফিড রেন্ডারার (নিজস্ব কান্ট্রি অনুযায়ী দেখাবে)
 async function fetchGlobalActivityLog() {
   const container = document.getElementById("globalActivityLog");
   if (!container || !_supabase) return;
@@ -1042,24 +1044,30 @@ async function fetchGlobalActivityLog() {
         second: "2-digit",
       });
 
-      // 🟢 নাম্বারের মাঝখানে **** বসিয়ে মাস্কিং করা হলো
       const maskedPhone = maskPhoneNumber(item.phone_number);
+
+      // 🟢 ওই অর্ডারের সাথে যে দেশের নাম সেভ করা ছিল সেটি নেওয়া
+      const itemCountry = item.country || window.activeStockCountry || "Canada";
+      const countryUpper = itemCountry.toUpperCase();
 
       let badge = "";
       let actionText = "";
 
-      if (item.action_type === "CANADA_SUCCESS") {
-        badge = `<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-bold">CANADA SUCCESS</span>`;
-        actionText = `successfully completed Canada order <span class="text-slate-300">#${item.order_id || ""}</span> (${maskedPhone})`;
-      } else if (item.action_type === "CANADA_CANCELED") {
-        badge = `<span class="bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded text-[10px] font-bold">CANADA CANCELED</span>`;
-        actionText = `canceled Canada order <span class="text-slate-300">#${item.order_id || ""}</span> (${maskedPhone})`;
-      } else if (item.action_type === "CANADA_NEW_ORDER") {
-        badge = `<span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded text-[10px] font-bold">CANADA ORDER</span>`;
-        actionText = `purchased Canada number <span class="text-slate-300">${maskedPhone}</span> (#${item.order_id || ""})`;
+      if (
+        item.action_type === "CANADA_SUCCESS" ||
+        item.action_type === "SUCCESS"
+      ) {
+        badge = `<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-bold">${countryUpper} SUCCESS</span>`;
+        actionText = `successfully completed ${itemCountry} order <span class="text-slate-300">#${item.order_id || ""}</span> (${maskedPhone})`;
+      } else if (
+        item.action_type === "CANADA_CANCELED" ||
+        item.action_type === "CANCELED"
+      ) {
+        badge = `<span class="bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded text-[10px] font-bold">${countryUpper} CANCELED</span>`;
+        actionText = `canceled ${itemCountry} order <span class="text-slate-300">#${item.order_id || ""}</span> (${maskedPhone})`;
       } else {
-        badge = `<span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded text-[10px] font-bold">ACTIVITY</span>`;
-        actionText = `performed action for <span class="text-slate-300">${maskedPhone}</span>`;
+        badge = `<span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded text-[10px] font-bold">${countryUpper} ORDER</span>`;
+        actionText = `purchased ${itemCountry} number <span class="text-slate-300">${maskedPhone}</span> (#${item.order_id || ""})`;
       }
 
       const logRow = document.createElement("div");
@@ -1081,6 +1089,7 @@ async function fetchGlobalActivityLog() {
     container.innerHTML = `<div class="text-slate-500 italic py-2">No platform activity recorded yet.</div>`;
   }
 }
+
 async function loadAllUserReportSheet() {
   if (!_supabase) return;
   const todayStr = new Date().toISOString().split("T")[0];
@@ -1437,7 +1446,7 @@ async function submitBulkWhatsAppNumbers() {
   }
 }
 
-// === BUY CANADA NUMBER (Per-User 10-Hour Cooldown & Success-Only Model) ===
+// === BUY CANADA/USA NUMBER (Per-User 10-Hour Cooldown & Success-Only Model) ===
 async function buyCanadaNumber() {
   if (!_supabase || !loggedInUser) return;
 
@@ -1479,7 +1488,7 @@ async function buyCanadaNumber() {
       .is("assigned_to", null);
 
     if (fetchErr || !availableStock || availableStock.length === 0) {
-      showToast("No Canada numbers available in stock right now!", true);
+      showToast("No numbers available in stock right now!", true);
       return;
     }
 
@@ -1533,7 +1542,19 @@ async function buyCanadaNumber() {
     const stockLinkStr = assignedStock.link || "https://sms.elitetrick.com/";
     const dhakaTimeIns = new Date().toISOString();
 
-    // 🟢 ৪. অর্ডার ইনসার্ট করার সময় স্ট্যাটাস "Order Confirm" সেট করা হলো
+    // 🟢 ৪. অর্ডার ইনসার্ট করার ঠিক আগে ডাটাবেজ থেকে লেটেস্ট কান্ট্রি চেক করা
+    let currentCountryName = window.activeStockCountry || "Canada";
+    const { data: settingData } = await _supabase
+      .from("platform_settings")
+      .select("active_country")
+      .eq("id", 1)
+      .maybeSingle();
+
+    if (settingData && settingData.active_country) {
+      currentCountryName = settingData.active_country;
+      window.activeStockCountry = currentCountryName;
+    }
+
     await _supabase.from("canada_orders").insert([
       {
         order_id: String(cadOrderId),
@@ -1541,6 +1562,7 @@ async function buyCanadaNumber() {
         otp: stockLinkStr,
         status: "Order Confirm",
         user_email: loggedInUser.email,
+        country: currentCountryName,
         created_at: dhakaTimeIns,
       },
     ]);
@@ -1550,6 +1572,8 @@ async function buyCanadaNumber() {
       "CANADA_NEW_ORDER",
       String(cadOrderId),
       phoneNumberStr,
+      null,
+      currentCountryName,
     );
 
     let newLimit = currentLimit - 1;
@@ -1564,7 +1588,7 @@ async function buyCanadaNumber() {
     if (typeof updateUserLimitSidebar === "function") updateUserLimitSidebar();
 
     document.getElementById("canadaOrderTitle").innerText =
-      `Canada Order #${cadOrderId}`;
+      `${currentCountryName} Order #${cadOrderId}`;
     document.getElementById("canadaActivationId").innerText = cadOrderId;
     document.getElementById("canadaPhoneNumber").innerText = phoneNumberStr;
     document.getElementById("canadaOtpCode").innerText = stockLinkStr;
@@ -1593,28 +1617,26 @@ async function buyCanadaNumber() {
     );
     if (canadaHistorySection) canadaHistorySection.classList.add("hidden");
 
-    showToast("Canada Number secured successfully!");
+    showToast("Number secured successfully!");
     if (typeof fetchDashboardStats === "function") fetchDashboardStats();
   } catch (e) {
-    console.error("Canada buy error:", e);
-    showToast("Error acquiring Canada number: " + e.message, true);
+    console.error("Buy error:", e);
+    showToast("Error acquiring number: " + e.message, true);
   } finally {
     if (btnTrigger) {
       btnTrigger.disabled = false;
-      btnTrigger.innerHTML = `<i class="fa-solid fa-cart-shopping text-sm"></i> Buy Canada Number`;
+      btnTrigger.innerHTML = `<i class="fa-solid fa-cart-shopping text-sm"></i> Buy Number`;
     }
   }
 }
-// === MARK CANADA ORDER AS SUCCESS (Saves Success Timestamp) ===
+// === MARK CANADA/USA ORDER AS SUCCESS ===
 async function completeCanadaActiveOrder(specificId) {
   const orderId =
     specificId || document.getElementById("canadaActivationId").innerText;
   if (!orderId || orderId === "-") return;
 
   if (
-    !confirm(
-      "Are you sure you want to mark this Canada order as Success Completed?",
-    )
+    !confirm("Are you sure you want to mark this order as Success Completed?")
   )
     return;
 
@@ -1622,16 +1644,20 @@ async function completeCanadaActiveOrder(specificId) {
 
   try {
     const cleanId = String(orderId).replace("#", "").trim();
-    const successTimeIso = new Date().toISOString(); // 🟢 বর্তমান সাকসেস টাইম
+    const successTimeIso = new Date().toISOString();
 
-    // অর্ডার থেকে ফোন নাম্বারটি বের করে নেওয়া
+    // 🟢 অর্ডার থেকে ফোন নাম্বার এবং ওই অর্ডারের আসল country বের করে নেওয়া
     const { data: orderData } = await _supabase
       .from("canada_orders")
-      .select("phone_number")
+      .select("phone_number, country")
       .eq("order_id", cleanId)
       .maybeSingle();
 
     const phoneNum = orderData ? orderData.phone_number : "";
+    const orderCountry =
+      orderData && orderData.country
+        ? orderData.country
+        : window.activeStockCountry || "Canada";
 
     // ১. স্ট্যাটাস Success এবং success_at টাইম আপডেট করা
     await _supabase
@@ -1642,12 +1668,14 @@ async function completeCanadaActiveOrder(specificId) {
       })
       .eq("order_id", cleanId);
 
-    // ২. অ্যাক্টিভিটি ফিডে লগ রেকর্ড করা
+    // ২. অ্যাক্টিভিটি ফিডে ওই অর্ডারের নিজস্ব দেশসহ লগ রেকর্ড করা
     await recordSystemLog(
       loggedInUser.email,
       "CANADA_SUCCESS",
       cleanId,
       phoneNum,
+      null,
+      orderCountry,
     );
 
     const statusEl = document.getElementById("canadaOrderStatusText");
@@ -1664,7 +1692,7 @@ async function completeCanadaActiveOrder(specificId) {
       successBtn.innerHTML = `<i class="fa-solid fa-check-double"></i> Completed`;
     }
 
-    showToast("Canada order marked as Success successfully!");
+    showToast(`${orderCountry} order marked as Success successfully!`);
 
     if (typeof fetchDashboardStats === "function") fetchDashboardStats();
 
@@ -1674,8 +1702,8 @@ async function completeCanadaActiveOrder(specificId) {
       }
     }, 1500);
   } catch (e) {
-    console.error("Success Canada error:", e);
-    showToast("Error updating Canada order: " + e.message, true);
+    console.error("Success order error:", e);
+    showToast("Error updating order: " + e.message, true);
   }
 }
 // === ৩. VIEW CANADA ORDER FROM HISTORY ===
@@ -2827,37 +2855,137 @@ function initLiveActivityToasts() {
         const log = payload.new;
         if (!log) return;
 
-        // ড্যাশবোর্ডের ফিডে যেভাবে টাইপ ও মেসেজ তৈরি হয়
-        const logType =
-          log.action_type || log.type || log.event_type || "CANADA ORDER";
-        const email = log.user_email || log.email || "user@nexa.com";
-        const actionDesc =
-          log.description ||
-          log.action_desc ||
-          log.message ||
-          log.details ||
-          "purchased Canada number";
-        const phone = log.phone_number
-          ? maskPhoneNumbersInText(log.phone_number)
-          : log.number
-            ? maskPhoneNumbersInText(log.number)
-            : "";
-        const orderId = log.order_id
-          ? `(#${log.order_id.replace("#", "")})`
-          : "";
-
-        // হুবহু স্ক্রিনশটের ফিডের ফরম্যাট অনুযায়ী টেক্সট সাজানো
-        // যেমন: nayan145@nexa.com purchased Canada stock number +122***7348 (#CAD-618219)
-        const formattedMsg = `${email} ${actionDesc} ${phone} ${orderId}`
-          .replace(/\s+/g, " ")
-          .trim();
-
-        showActivityToast(logType, formattedMsg);
+        // ডাইনামিক দেশের নাম অনুযায়ী মেসেজ ও ব্যাজ ফরম্যাট করা
+        const formatted = formatActivityMessage(log);
+        showActivityToast(formatted.type, formatted.text);
       },
     )
     .subscribe();
 }
-
 window.addEventListener("DOMContentLoaded", () => {
   setTimeout(initLiveActivityToasts, 1500);
+});
+
+// === SINGLE COUNTRY NAME SWITCHER FOR ACTIVITY FEED & TOAST ===
+
+window.activeStockCountry = "Canada";
+
+// ১. ডাটাবেজ থেকে সেভ করা দেশের নাম লোড করা
+async function loadActivityCountrySetting() {
+  if (!_supabase) return;
+  const { data } = await _supabase
+    .from("platform_settings")
+    .select("active_country")
+    .eq("id", 1)
+    .single();
+
+  if (data && data.active_country) {
+    window.activeStockCountry = data.active_country;
+    const inputEl = document.getElementById("settingActiveCountry");
+    if (inputEl) inputEl.value = data.active_country;
+
+    // দেশের নাম লোড হওয়ার পরপরই ফিড রিফ্রেশ করা
+    if (typeof fetchGlobalActivityLog === "function") {
+      fetchGlobalActivityLog();
+    }
+  }
+}
+
+// ২. নতুন দেশের নাম সেভ করা
+async function saveActivityCountrySetting() {
+  if (!_supabase) return;
+
+  const countryVal =
+    document.getElementById("settingActiveCountry")?.value.trim() || "Canada";
+
+  const { error } = await _supabase.from("platform_settings").upsert({
+    id: 1,
+    active_country: countryVal,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (error) {
+    alert("Error saving country: " + error.message);
+  } else {
+    window.activeStockCountry = countryVal;
+
+    // সেভ হওয়ার সাথে সাথে ড্যাশবোর্ডের ফিড আপডেট করা
+    if (typeof fetchGlobalActivityLog === "function") {
+      fetchGlobalActivityLog();
+    }
+
+    if (typeof showToast === "function") {
+      showToast(`Stock country updated to "${countryVal}"!`);
+    } else {
+      alert(`Updated to ${countryVal}!`);
+    }
+  }
+}
+
+// ৪. অন্য ইউজারদের স্ক্রিনেও যেন রিয়েল-টাইমে দেশের নাম পরিবর্তন হয় তার লিসেনার
+window.addEventListener("DOMContentLoaded", () => {
+  loadActivityCountrySetting();
+
+  if (_supabase) {
+    _supabase
+      .channel("realtime-platform-country")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "platform_settings" },
+        (payload) => {
+          if (payload.new && payload.new.active_country) {
+            window.activeStockCountry = payload.new.active_country;
+            const inputEl = document.getElementById("settingActiveCountry");
+            if (inputEl) inputEl.value = payload.new.active_country;
+            if (typeof fetchGlobalActivityLog === "function") {
+              fetchGlobalActivityLog();
+            }
+          }
+        },
+      )
+      .subscribe();
+  }
+});
+
+// ১. ফরম্যাট মেসেজ ফাংশন (লগে সেভ থাকা নিজস্ব কান্ট্রি ব্যবহার করবে)
+function formatActivityMessage(log) {
+  const email = log.user_email || log.email || "admin@nexa.com";
+  const rawType = (
+    log.action_type ||
+    log.type ||
+    log.event_type ||
+    "ACTIVITY"
+  ).toUpperCase();
+
+  let rawPhone = log.phone_number || log.number || "";
+  if (!rawPhone) {
+    const match = JSON.stringify(log).match(/(\+?\d{10,15})/);
+    if (match) rawPhone = match[0];
+  }
+  const maskedPhone = rawPhone ? maskPhoneNumbersInText(rawPhone) : "";
+  const orderId = log.order_id
+    ? `#${String(log.order_id).replace("#", "")}`
+    : "";
+
+  // 🟢 লগে সেভ থাকা দেশের নাম ব্যবহার করবে, না থাকলে বর্তমান গ্লোবাল নাম
+  const logCountry = log.country || window.activeStockCountry || "Canada";
+  const countryUpper = logCountry.toUpperCase();
+  const isSuccess =
+    rawType.includes("SUCCESS") || rawType.includes("COMPLETED");
+
+  if (isSuccess) {
+    return {
+      type: `${countryUpper} SUCCESS`,
+      text: `${logCountry} order ${orderId} has been successfully completed. Number: ${maskedPhone}`,
+    };
+  } else {
+    return {
+      type: `${countryUpper} ORDER`,
+      text: `${email} successfully purchased a ${logCountry} number: ${maskedPhone} | Order ID: ${orderId}`,
+    };
+  }
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  setTimeout(loadActivityCountrySetting, 1000);
 });
